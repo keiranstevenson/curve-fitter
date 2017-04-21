@@ -9,4 +9,5 @@ from platereaderimport import platereaderimport as pltim
 
 filename = 'Datafiles/truncatedtest.CSV'
 pltim(filename,noruns=1,nosamples=5)
+print('YAY')
 
