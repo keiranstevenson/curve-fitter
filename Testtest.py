@@ -13,19 +13,19 @@ import matplotlib.pyplot as plt
 
 
 indata = pd.read_csv('Datafiles/160705_2308.CSV',header= None,skiprows= 6)
+deletewells = 0
+labelcols = 3
 
-infile = indata.iloc[:,0:]
-data = indata.iloc[:,3:]
-
-time = data.iloc[0]
-od = data.iloc[16]
-
-plt.figure()
-plt.subplot(2,1,1)
-plt.plot(time,od,'r.')
-plt.ylabel('OD')
-plt.xlabel('Time [h]')
-plt.subplot(2,1,2)
-plt.plot(time,od,'b.')
-plt.ylabel('GR [Hr$^{-1}$]')
-plt.xlabel('Time [h]')
+cols = indata.iloc[:,0]
+colindex = (cols == 'A') | (cols == 'H')
+cols = indata.iloc[:,1]
+colindex = (cols == 1) | (cols == 12) | colindex
+if deletewells == 1:
+    colindex = colindex == False
+    data = indata.loc[colindex]
+    data = data.copy()
+else:        
+    data = indata.copy()
+    for i in range(0,len(colindex)):
+        if 1 == colindex[i]:
+            data.iloc[[i],3:] = np.zeros(data.shape[1]-3)

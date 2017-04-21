@@ -2,7 +2,7 @@
 """
 Created on Mon Jun 13 16:09:32 2016
 
-@author: s1002426
+@author: Keiran Stevenson
 """
 
 import numpy as np
@@ -10,6 +10,7 @@ import pandas as pd
 from fitderiv import fitderiv
 import matplotlib.pyplot as plt
 import os
+from glob import glob
 
 
 def platereaderimport(filename,header= None, manufacturer= 'BMG', skiprows= 0, labelcols = 1, 
@@ -37,14 +38,16 @@ def platereaderimport(filename,header= None, manufacturer= 'BMG', skiprows= 0, l
         if not os.path.isdir(filename.split('/')[-2] + '/plots/'):
             os.makedirs(filename.split('/')[-2] + '/plots/') 
         
+    # Process files before inputting
+    if replicates == 1 & os.path.isdir(filename)==True:
+        infile = multifilerepimport(filename, header, skiprows, labelcols, waterwells)
+    elif os.path.isdir(filename):
+        replicates == 1
+    else:
+        infile = pd.read_csv(filename, header=header, skiprows=skiprows)
     
-    
-    infile = pd.read_csv(filename,header= header,skiprows= skiprows)
-    
-    # Process file before inputting
-    removewaterwells(infile,labelcols)
-        
-        
+        if waterwells == 1:
+            infile = removewaterwells(infile,labelcols,0)    
         
     
     # Prepare output variables with names
@@ -165,15 +168,35 @@ def platereaderimport(filename,header= None, manufacturer= 'BMG', skiprows= 0, l
     
     
     
-def removewaterwells(indata,labelcols):
-    
-    data = indata.iloc[:,labelcols:]
-    
+def removewaterwells(indata,labelcols,deletewells):
+       
     cols = indata.iloc[:,0]
     colindex = (cols == 'A') | (cols == 'H')
     cols = indata.iloc[:,1]
     colindex = (cols == 1) | (cols == 12) | colindex
-    for i in range(0,len(colindex)):
-        if 1 == colindex[i]:
-            indata.iloc[[i],3:] = np.zeros(data.shape[1])
+    if deletewells == 1:
+        colindex = colindex == False
+        data = indata.loc[colindex]
+        data = data.copy()
+    else:        
+        data = indata.copy()
+        for i in range(0,len(colindex)):
+            if 1 == colindex[i]:
+                data.iloc[[i],3:] = np.zeros(data.shape[1]-3)
+    return data
             
+def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
+    files = glob(filedirectory + '/*.csv')
+    #files = [file.split('/')[-1] for file in files]
+    for i in range(0,(len(files)-1)):
+        if i == 0:
+            stackfile = pd.read_csv(files[i],header= header,skiprows= skiprows)
+        else:
+            newfile = pd.read_csv(files[i],header= header,skiprows= skiprows+1)
+            stack = [stackfile,newfile]
+            stackfile = pd.concat(stack)
+    if waterwells == 1:
+        removewaterwells(stackfile,labelcols,1)
+   
+    return stackfile
+    
