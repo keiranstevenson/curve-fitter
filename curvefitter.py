@@ -15,88 +15,93 @@ import re
 import sys
 
 
-def platereaderimport(filename,header= None, predefinedinput= 'BMG', skiprows= 0, labelcols = 3, replicols = 3, repignore = None,
-                      waterwells = 1, replicates = 0, normalise = 0.05, growthmin = 0.05, 
-                      fitparams= {0: [-5,8],1: [-6,-1], 2: [-5,2]}, noruns= 5, nosamples= 20,
-                      makeplots = 1):
-    # filename or folder location, if latter then all files imported and processed
-    # waterwells; ignores wells on the outside
-    # replicates; indicates presense of replicates, denoted by same sample no in 3rd column BMG files
-    # Manufacturer; Software that the data was exported for, sets skiprows and labelcol based on that
-    # skiprows; lines of input file to skip before retrieving data. First row assumed as time with data following immediately below
-    # labelcol; assumes first n rows are labels/text and are used to populate the output
-    # fitparams; fitparameters used by the deODoriser
-    # noruns; number of fitting attempts made
-    # nosamples; number of samples used to calculate error
-                      
+def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, labelcols= 3, replicols= 3, 
+                      waterwells= False, replicates= False, repignore= None, normalise= 0.05, growthmin= 0.05, alignvalue= 0.1,
+                      fitparams= {0:[-5,8], 1:[-6,-1], 2:[-5,2]}, noruns= 5, nosamples= 20,
+                      makeplots = True, showplots= True):
+    '''
+    filename: filename or folder location (only if replicates==1)
+    predefinedinput: 'BMG' sets skiprows, labelcols, replicols and repignore based on standard format for BMG platereader files
+    skiprows; lines of input file to skip before retrieving data. First row assumed as time with data following immediately below
+    labelcols; first n columns are labels/text and are used to populate the output
+    replicols; column containing the strings used to match replicates
+    waterwells; ignores wells on the outside of 96 well plate
+    replicates; indicates presense of replicates to be used for data sorting automatically runs normalise and align on replicates to ensure most accurate GR
+    repignore; regex string that defines replicates to be ignored ie 'Sample *' for BMG files
+    normalise; value that data is normalised to at the start DO NOT USE 0 or log function will fail
+    growthmin; minimum value required for growth to be counted and fitted, fitting purely flat functions consumes time for fitting and produces unreliable results
+    alignvalue; aligns replicates so that this value is reached at the same time for all reps
+    fitparams; fitparameters used by the deODoriser
+    noruns; number of fitting attempts made
+    nosamples; number of samples used to calculate error
+    makeplots; determines if program makes plots and saves to output folder
+    showplots; displays plots during processing
+    '''
     
     if (predefinedinput == 'BMG'):
         skiprows= 6
         labelcols = 3
         replicols = 3
         repignore = 'Sample X*'
+
         
-    elif (predefinedinput == 'Tecan'):
-        skiprows= 63
-        labelcols = 1
-        if replicates == 1 & replicols > labelcols:
-            replicates = 0
-        
-    replicols = replicols-1
+    replicols = replicols-1 # convers to index from number
     # Process files before inputting
     filename = os.path.realpath(filename)
-    if replicates == 1 & os.path.isdir(filename)==True:
+    if replicates & os.path.isdir(filename)==True:
         infile = multifilerepimport(filename, header, skiprows, labelcols, waterwells)
-        filepath = filename + '/' + filename.split('/')[-1] + ' outputdata'
-        filename = filename.split('/')[-1]
+        filepath = os.path.join(filename, os.path.split(filename)[-1] + ' outputdata')
+        filename = os.path.split(filename)[-1]
         infile = cleannonreps(infile, replicols, repignore)
         
         reps = infile.iloc[1:,replicols]
         uniquereps = np.unique(reps)
         
         # Provide info about datashape
-        dataheight = uniquereps.shape[0]+1
+        dataheight = uniquereps.shape[0]
         datalength = infile.shape[1]
         firstline = infile.iloc[0]
     else:
         infile = pd.read_csv(filename, header=header, skiprows=skiprows)
+        infile = infile.iloc[:,0:-1]
         filepath = os.path.split(filename)[0]
         filename = os.path.split(filename)[1]
-        filepath = filepath + '/' + filename.split('.')[-2] + ' outputdata'
-        if waterwells == 1:
-            infile = removewaterwells(infile,labelcols,0)    
+        filepath = os.path.join(filepath, filename.split('.')[-2] + ' outputdata')
+        if waterwells:
+            infile = removewaterwells(infile,labelcols)    
         
         # Gather info about raw numerical data
-        dataheight = infile.shape[0]
+        dataheight = infile.shape[0]-1 #ignore time row
         datalength = infile.shape[1]
         firstline = infile.iloc[0]
 
+    infile = normalisetraces(infile, normalise, labelcols)
     # Checks and makes output directories
     if not os.path.isdir(filepath):
         os.makedirs(filepath)       
-    if makeplots == 1:
-        if not os.path.isdir(filepath + '/plots/'):
-            os.makedirs(filepath + '/plots/') 
+    if makeplots:
+        if not os.path.isdir(os.path.join(filepath, 'plots', )):
+            os.makedirs(os.path.join(filepath, 'plots', )) 
     
     # Separate time variable
     time = infile.iloc[0]
-    time = time[labelcols:]
+    time = time.iloc[labelcols:]
     time = np.float64(time)
     
-   
-    
-    for i in range(1,dataheight):
+    for i in range(1,dataheight+1):
         location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
         print(location)     
         sys.stdout.flush()
-        if replicates == 1:
+        if replicates:
             repset = uniquereps[i-1]
             repselection = repset == infile.iloc[:,replicols]
             od = infile.loc[repselection]
             labels = od.iloc[0,0:labelcols]
             labels = labels.copy()
             od = (od.iloc[:,labelcols:]).copy()
-        
+            # Converts columns to float format for fitderiv    
+            odfloat = np.array(od,dtype='float64')  
+            odfloat = alignreplicates(odfloat, normalise, alignvalue)
             
         else:
             od = infile.iloc[i]
@@ -104,17 +109,14 @@ def platereaderimport(filename,header= None, predefinedinput= 'BMG', skiprows= 0
             
             labels = infile.iloc[i,0:labelcols]
             labels = labels.copy()
-        # Converts columns to float format for fitderiv    
-        odfloat = np.array(od,dtype='float64')  
+            # Converts columns to float format for fitderiv    
+            odfloat = np.array(od,dtype='float64')  
         
         # Removes nans from data that matlab put in
-        #odfloat =  odfloat[np.isfinite(odfloat)] #  [ num for num in odfloat if (False ==(np.isnan(num)).any())] 
         datalength = odfloat.shape[-1]
         t = time[:datalength]
         
-        
         # Check for growth
-    
         diff = np.amax(np.ndarray.flatten(odfloat))-np.amin(np.ndarray.flatten(odfloat))
         
         if diff > growthmin: 
@@ -130,35 +132,32 @@ def platereaderimport(filename,header= None, predefinedinput= 'BMG', skiprows= 0
             fitcurveerr = fitty.fvar
             fitdercurve = fitty.df
             fitdercurveerr = fitty.dfvar
-            time = fitty.t
+            functime = fitty.t
             
-            if makeplots == 1:
+            if makeplots:
                 plt.figure()
                 plt.subplot(2,1,1)
-                plt.plot(time,fitty.d,'r.')
-                plt.plot(time,fitcurve,'b')
+                plt.plot(functime,fitty.d,'r.')
+                plt.plot(functime,fitcurve,'b')
                 plt.ylabel('log OD')
                 plt.xlabel('Time [h]')
                 plt.subplot(2,1,2)
-                plt.plot(time,fitdercurve,'b')
-                plt.fill_between(t, fitdercurve-np.sqrt(fitdercurveerr),fitdercurve+np.sqrt(fitdercurveerr), facecolor= 'blue', alpha=0.2)
+                plt.plot(functime,fitdercurve,'b')
+                plt.fill_between(functime, fitdercurve-np.sqrt(fitdercurveerr),fitdercurve+np.sqrt(fitdercurveerr), facecolor= 'blue', alpha=0.2)
                 plt.ylabel('GR [Hr$^{-1}$]')
                 plt.xlabel('Time [h]')
 
-                if replicates == 1:
+                if replicates:
                     picname = str(infile.iloc[i,replicols])
-                        
                 elif predefinedinput == 'BMG':
                     picname = str(infile.iloc[i,0]) + str(int(infile.iloc[i,1]))
-                    
                 else:
                     picname = str(infile.iloc[i,0])
-                
                 picname = filepath + '/plots/' + picname + '.PNG'
                 plt.savefig(picname)
-                plt.show()
+                if showplots:
+                    plt.show()
                         
-                
         else:
             # Returns no growth if none detected
             Gr = 0
@@ -198,12 +197,10 @@ def platereaderimport(filename,header= None, predefinedinput= 'BMG', skiprows= 0
         growthcurvesder     = pd.concat([growthcurvesder,growthcurvesderin],ignore_index = True)
         growthcurvesdererr  = pd.concat([growthcurvesdererr,growthcurvesdererrin],ignore_index = True)    
 
-            
-        
     varnames = ['Row','Column','Note','GR','GR Err', 'Lag', 'Time of max GR']
     growthrates.columns = varnames        
         
-    Outputname = filepath + '/' + filename + ' Analysed.xlsx'
+    Outputname = os.path.join(filepath, filename + ' Analysed.xlsx')
     writer = pd.ExcelWriter(Outputname, engine='xlsxwriter')
     growthrates.to_excel(writer, sheet_name='Stats')
     growthcurves.to_excel(writer, sheet_name='fit')
@@ -214,8 +211,8 @@ def platereaderimport(filename,header= None, predefinedinput= 'BMG', skiprows= 0
     
     
     
-def removewaterwells(indata,labelcols,deletewells):
-       
+def removewaterwells(indata,labelcols,deletewells=1):
+    # deletewells removes from tables else forces points to zero
     cols = indata.iloc[:,0]
     colindex = (cols == 'A') | (cols == 'H')
     cols = indata.iloc[:,1]
@@ -248,17 +245,31 @@ def cleannonreps(indata, replicol, repignore):
             
             
 def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
-    files = glob(filedirectory + '/*.csv')
+    files = glob(os.path.join(filedirectory + '*.csv'))
+        
+    # First need to determine minimum file length to use as first input
+    lengths = np.array(np.zeros([np.shape(files)[0],1]),dtype='int')
+    for i in range(0,(len(files))):
+        testfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
+        lengths[i] = testfile.shape[1]
+    
+    minlength = np.amin(lengths)
+    
+    # Assembles all files into a single large dataset
     for i in range(0,(len(files))):
         if i == 0:
             stackfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
+            if stackfile.shape[1] > minlength:
+                stackfile = stackfile.iloc[:,0:minlength-1]
+                
         else:
             newfile = pd.read_csv(files[i], header= header, skiprows= skiprows+1)
+            if newfile.shape[1] > minlength:
+                newfile = newfile.iloc[:,0:minlength-1]
             stack = [stackfile,newfile]
             stackfile = pd.concat(stack,ignore_index = True)
-    if waterwells == 1:
-        removewaterwells(stackfile,labelcols,1)
-   
+    if waterwells:
+        removewaterwells(stackfile,labelcols)
     return stackfile
     
     
@@ -278,7 +289,7 @@ def normalisetraces(indata, normvalue= 0.05, labelcols= 3, timerow= 1):
         else:
             stack= np.vstack((stack,newnumline))
     indata.iloc[1:,labelcols:] = stack 
-    return    
+    return indata    
 
 
 def alignreplicates(dataset, normvalue= 0.05, alignvalue= 0.1):
