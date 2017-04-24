@@ -11,9 +11,11 @@ from fitderiv import fitderiv
 import matplotlib.pyplot as plt
 import os
 from glob import glob
+import re
+import sys
 
 
-def platereaderimport(filename,header= None, predefinedinput= 'BMG', skiprows= 0, labelcols = 1, replicols = 2, repignore = None,
+def platereaderimport(filename,header= None, predefinedinput= 'BMG', skiprows= 0, labelcols = 3, replicols = 3, repignore = None,
                       waterwells = 1, replicates = 0, normalise = 0.05, growthmin = 0.05, 
                       fitparams= {0: [-5,8],1: [-6,-1], 2: [-5,2]}, noruns= 5, nosamples= 20,
                       makeplots = 1):
@@ -26,10 +28,12 @@ def platereaderimport(filename,header= None, predefinedinput= 'BMG', skiprows= 0
     # fitparams; fitparameters used by the deODoriser
     # noruns; number of fitting attempts made
     # nosamples; number of samples used to calculate error
+                      
     
     if (predefinedinput == 'BMG'):
         skiprows= 6
         labelcols = 3
+        replicols = 3
         repignore = 'Sample X*'
         
     elif (predefinedinput == 'Tecan'):
@@ -38,75 +42,84 @@ def platereaderimport(filename,header= None, predefinedinput= 'BMG', skiprows= 0
         if replicates == 1 & replicols > labelcols:
             replicates = 0
         
-
+    replicols = replicols-1
     # Process files before inputting
     filename = os.path.realpath(filename)
     if replicates == 1 & os.path.isdir(filename)==True:
         infile = multifilerepimport(filename, header, skiprows, labelcols, waterwells)
         filepath = filename + '/' + filename.split('/')[-1] + ' outputdata'
         filename = filename.split('/')[-1]
+        infile = cleannonreps(infile, replicols, repignore)
         
-#    elif os.path.isdir(filename):
-#       replicates == 1
+        reps = infile.iloc[1:,replicols]
+        uniquereps = np.unique(reps)
+        
+        # Provide info about datashape
+        dataheight = uniquereps.shape[0]+1
+        datalength = infile.shape[1]
+        firstline = infile.iloc[0]
     else:
         infile = pd.read_csv(filename, header=header, skiprows=skiprows)
         filepath = os.path.split(filename)[0]
         filename = os.path.split(filename)[1]
         filepath = filepath + '/' + filename.split('.')[-2] + ' outputdata'
-    
         if waterwells == 1:
             infile = removewaterwells(infile,labelcols,0)    
+        
+        # Gather info about raw numerical data
+        dataheight = infile.shape[0]
+        datalength = infile.shape[1]
+        firstline = infile.iloc[0]
 
+    # Checks and makes output directories
     if not os.path.isdir(filepath):
         os.makedirs(filepath)       
-        
-        
-    if makeplots == 1: # makes directory for plots to be put in
+    if makeplots == 1:
         if not os.path.isdir(filepath + '/plots/'):
             os.makedirs(filepath + '/plots/') 
     
-
-    
-    # Prepare output variables with names
-    growthrates = infile.iloc[1:,0:7]
-    growthcurves = infile.copy()
-    growthcurveserr = infile.copy()
-    growthcurvesder = infile.copy()
-    growthcurvesdererr = infile.copy()
-    varnames = ['Row','Column','Note','GR','GR Err', 'Lag', 'Time of max GR']
-    growthrates.columns = varnames
     # Separate time variable
     time = infile.iloc[0]
     time = time[labelcols:]
     time = np.float64(time)
-    # Gather info about raw numerical data
-    dataheight = infile.shape[0]-1
-    datalength = infile.shape[1]    
+    
+   
     
     for i in range(1,dataheight):
         location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
         print(location)     
+        sys.stdout.flush()
+        if replicates == 1:
+            repset = uniquereps[i-1]
+            repselection = repset == infile.iloc[:,replicols]
+            od = infile.loc[repselection]
+            labels = od.iloc[0,0:labelcols]
+            labels = labels.copy()
+            od = (od.iloc[:,labelcols:]).copy()
         
-        od = infile.iloc[i]
-        
-        od = od[labelcols:]
-        od = od
-        
+            
+        else:
+            od = infile.iloc[i]
+            od = od[labelcols+1:]
+            
+            labels = infile.iloc[i,0:labelcols]
+            labels = labels.copy()
         # Converts columns to float format for fitderiv    
-        odfloat = np.float64(od)  
+        odfloat = np.array(od,dtype='float64')  
         
         # Removes nans from data that matlab put in
-        odfloat =  odfloat[np.isfinite(odfloat)] #  [ num for num in odfloat if (False ==(np.isnan(num)).any())] 
-        datalength = len(odfloat)
+        #odfloat =  odfloat[np.isfinite(odfloat)] #  [ num for num in odfloat if (False ==(np.isnan(num)).any())] 
+        datalength = odfloat.shape[-1]
         t = time[:datalength]
         
         
         # Check for growth
-        diff = np.amax(od)-np.amin(od)        
+    
+        diff = np.amax(np.ndarray.flatten(odfloat))-np.amin(np.ndarray.flatten(odfloat))
         
         if diff > growthmin: 
             # Runs fitderiv only if growth is over 0.05
-            fitty = fitderiv(t,odfloat,bd= fitparams,exitearly= False,nosamples= nosamples, noruns= noruns) # Peters program
+            fitty = fitderiv(t,np.transpose(odfloat),bd= fitparams,exitearly= False,nosamples= nosamples, noruns= noruns) # Peters program
             Gr = fitty.ds['max df']
             Err = fitty.ds['max df var']
             Lag = fitty.ds['lag time']
@@ -117,16 +130,17 @@ def platereaderimport(filename,header= None, predefinedinput= 'BMG', skiprows= 0
             fitcurveerr = fitty.fvar
             fitdercurve = fitty.df
             fitdercurveerr = fitty.dfvar
+            time = fitty.t
             
             if makeplots == 1:
                 plt.figure()
                 plt.subplot(2,1,1)
-                plt.plot(t,fitty.d,'r.')
-                plt.plot(t,fitcurve,'b')
+                plt.plot(time,fitty.d,'r.')
+                plt.plot(time,fitcurve,'b')
                 plt.ylabel('log OD')
                 plt.xlabel('Time [h]')
                 plt.subplot(2,1,2)
-                plt.plot(t,fitdercurve,'b')
+                plt.plot(time,fitdercurve,'b')
                 plt.fill_between(t, fitdercurve-np.sqrt(fitdercurveerr),fitdercurve+np.sqrt(fitdercurveerr), facecolor= 'blue', alpha=0.2)
                 plt.ylabel('GR [Hr$^{-1}$]')
                 plt.xlabel('Time [h]')
@@ -163,16 +177,31 @@ def platereaderimport(filename,header= None, predefinedinput= 'BMG', skiprows= 0
                 print("No growth found! Less than " + str(growthmin) + ' change in OD detected')
         
         # Sticks into the output variable (allows individual debugging)
-        growthrates.ix[i,2] = note    
-        growthrates.ix[i,3] = Gr
-        growthrates.ix[i,4] = Err
-        growthrates.ix[i,5] = Lag
-        growthrates.ix[i,6] = TimeofmaxGr
         
-        growthcurves.ix[i,labelcols:datalength+labelcols-1] = fitcurve
-        growthcurveserr.ix[i,labelcols:datalength+labelcols-1] = fitcurveerr
-        growthcurvesder.ix[i,labelcols:datalength+labelcols-1] = fitdercurve
-        growthcurvesdererr.ix[i,labelcols:datalength+labelcols-1] = fitdercurveerr
+        if i == 1:
+            growthrates         = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr])],ignore_index = True)).transpose()
+            growthcurves        = (pd.DataFrame(firstline)).transpose()
+            growthcurveserr     = (pd.DataFrame(firstline)).transpose()
+            growthcurvesder     = (pd.DataFrame(firstline)).transpose()
+            growthcurvesdererr  = (pd.DataFrame(firstline)).transpose()       
+        else:    
+            growthratesin           = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr])],ignore_index = True)).transpose()
+            growthrates         = pd.concat([growthrates,growthratesin],ignore_index = True)
+
+        growthcurvesin          = (pd.concat([labels,pd.DataFrame(fitcurve)],ignore_index = True)).transpose()
+        growthcurveserrin       = (pd.concat([labels,pd.DataFrame(fitcurveerr)],ignore_index = True)).transpose()
+        growthcurvesderin       = (pd.concat([labels,pd.DataFrame(fitdercurve)],ignore_index = True)).transpose()
+        growthcurvesdererrin    = (pd.concat([labels,pd.DataFrame(fitdercurveerr)],ignore_index = True)).transpose()
+        
+        growthcurves        = pd.concat([growthcurves,growthcurvesin],ignore_index = True)
+        growthcurveserr     = pd.concat([growthcurveserr,growthcurveserrin],ignore_index = True)
+        growthcurvesder     = pd.concat([growthcurvesder,growthcurvesderin],ignore_index = True)
+        growthcurvesdererr  = pd.concat([growthcurvesdererr,growthcurvesdererrin],ignore_index = True)    
+
+            
+        
+    varnames = ['Row','Column','Note','GR','GR Err', 'Lag', 'Time of max GR']
+    growthrates.columns = varnames        
         
     Outputname = filepath + '/' + filename + ' Analysed.xlsx'
     writer = pd.ExcelWriter(Outputname, engine='xlsxwriter')
@@ -201,18 +230,32 @@ def removewaterwells(indata,labelcols,deletewells):
             if 1 == colindex[i]:
                 data.iloc[[i],3:] = np.zeros(data.shape[1]-3)
     return data
+    
+    
+def cleannonreps(indata, replicol, repignore):
+    if repignore == None:
+        return indata
+    if isinstance(repignore,str):
+        cols = indata.iloc[:,replicol]
+        a = np.array(cols)
+        for i in range(cols.size): 
+            if re.match(repignore,cols[i]):
+                a[i]= False
+            else:
+                a[i]= True
+        indata = (indata.loc[a]).copy()
+    return indata
             
             
 def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
     files = glob(filedirectory + '/*.csv')
-    #files = [file.split('/')[-1] for file in files]
-    for i in range(0,(len(files)-1)):
+    for i in range(0,(len(files))):
         if i == 0:
             stackfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
         else:
             newfile = pd.read_csv(files[i], header= header, skiprows= skiprows+1)
             stack = [stackfile,newfile]
-            stackfile = pd.concat(stack)
+            stackfile = pd.concat(stack,ignore_index = True)
     if waterwells == 1:
         removewaterwells(stackfile,labelcols,1)
    
