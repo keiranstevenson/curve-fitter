@@ -118,7 +118,6 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             
             # Check for growth
             diff = np.amax(np.ndarray.flatten(odfloat))-np.amin(np.ndarray.flatten(odfloat))
-            
             if diff > growthmin: 
                 # Runs fitderiv only if growth is over 0.05
                 for attemptno in range(5):
@@ -126,10 +125,10 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                         fitty = fitderiv(t,np.transpose(odfloat),bd= fitparams,exitearly= False,nosamples= nosamples, noruns= noruns) # Peters program
                         break
                     except KeyboardInterrupt:
-                        raise
+                        raise(KeyboardInterrupt)
                     except:
                         if attemptno == 4:
-                            pass
+                            raise
                 Gr = fitty.ds['max df']
                 Err = fitty.ds['max df var']
                 Lag = fitty.ds['lag time']
@@ -214,7 +213,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             growthcurvesder.to_excel(writer, sheet_name='Derivative')
             growthcurvesdererr.to_excel(writer, sheet_name='Derivative err')
             writer.save()
-        pass
+        raise
             
     varnames = ['Row','Column','Note','GR','GR Err', 'Lag', 'Time of max GR']
     growthrates.columns = varnames        
@@ -263,6 +262,7 @@ def cleannonreps(indata, replicol, repignore):
             except:
                 print('WARNING: unparsable replicate label, skipping')
                 a[i]= False
+                pass
         indata = (indata.loc[a]).copy()
     return indata
             
