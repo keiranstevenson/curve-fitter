@@ -87,116 +87,135 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
     time = infile.iloc[0]
     time = time.iloc[labelcols:]
     time = np.float64(time)
-    
-    for i in range(1,dataheight+1):
-        location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
-        print(location)     
-        sys.stdout.flush()
-        if replicates:
-            repset = uniquereps[i-1]
-            repselection = repset == infile.iloc[:,replicols]
-            od = infile.loc[repselection]
-            labels = od.iloc[0,0:labelcols]
-            labels = labels.copy()
-            od = (od.iloc[:,labelcols:]).copy()
-            # Converts columns to float format for fitderiv    
-            odfloat = np.array(od,dtype='float64')  
-            odfloat = alignreplicates(odfloat, normalise, alignvalue)
-            
-        else:
-            od = infile.iloc[i]
-            od = od[labelcols+1:]
-            
-            labels = infile.iloc[i,0:labelcols]
-            labels = labels.copy()
-            # Converts columns to float format for fitderiv    
-            odfloat = np.array(od,dtype='float64')  
-        
-        # Removes nans from data that matlab put in
-        datalength = odfloat.shape[-1]
-        t = time[:datalength]
-        
-        # Check for growth
-        diff = np.amax(np.ndarray.flatten(odfloat))-np.amin(np.ndarray.flatten(odfloat))
-        
-        if diff > growthmin: 
-            # Runs fitderiv only if growth is over 0.05
-            fitty = fitderiv(t,np.transpose(odfloat),bd= fitparams,exitearly= False,nosamples= nosamples, noruns= noruns) # Peters program
-            Gr = fitty.ds['max df']
-            Err = fitty.ds['max df var']
-            Lag = fitty.ds['lag time']
-            TimeofmaxGr = fitty.ds['time of max df']
-            note = ["Normal"]
-            
-            fitcurve = fitty.f
-            fitcurveerr = fitty.fvar
-            fitdercurve = fitty.df
-            fitdercurveerr = fitty.dfvar
-            functime = fitty.t
-            
-            if makeplots:
-                plt.figure()
-                plt.subplot(2,1,1)
-                plt.plot(functime,fitty.d,'r.')
-                plt.plot(functime,fitcurve,'b')
-                plt.ylabel('log OD')
-                plt.xlabel('Time [h]')
-                plt.subplot(2,1,2)
-                plt.plot(functime,fitdercurve,'b')
-                plt.fill_between(functime, fitdercurve-np.sqrt(fitdercurveerr),fitdercurve+np.sqrt(fitdercurveerr), facecolor= 'blue', alpha=0.2)
-                plt.ylabel('GR [Hr$^{-1}$]')
-                plt.xlabel('Time [h]')
-
-                if replicates:
-                    picname = str(infile.iloc[i,replicols])
-                elif predefinedinput == 'BMG':
-                    picname = str(infile.iloc[i,0]) + str(int(infile.iloc[i,1]))
-                else:
-                    picname = str(infile.iloc[i,0])
-                picname = filepath + '/plots/' + picname + '.PNG'
-                plt.savefig(picname)
-                if showplots:
-                    plt.show()
-                        
-        else:
-            # Returns no growth if none detected
-            Gr = 0
-            Err = 0
-            Lag = 0
-            note = ["No Growth"]
-            TimeofmaxGr = 0
-            
-            fitcurve = np.zeros(datalength)
-            fitcurveerr = np.zeros(datalength)
-            fitdercurve = np.zeros(datalength)
-            fitdercurveerr = np.zeros(datalength)
-            if diff == 0:
-                print("Empty well, skipping analysis.")
+    try:
+        for i in range(1,dataheight+1):
+            location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
+            print(location)     
+            sys.stdout.flush()
+            if replicates:
+                repset = uniquereps[i-1]
+                repselection = repset == infile.iloc[:,replicols]
+                od = infile.loc[repselection]
+                labels = od.iloc[0,0:labelcols]
+                labels = labels.copy()
+                od = (od.iloc[:,labelcols:]).copy()
+                # Converts columns to float format for fitderiv    
+                odfloat = np.array(od,dtype='float64')  
+                odfloat = alignreplicates(odfloat, normalise, alignvalue)
+                
             else:
-                print("No growth found! Less than " + str(growthmin) + ' change in OD detected')
-        
-        # Sticks into the output variable (allows individual debugging)
-        
-        if i == 1:
-            growthrates         = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr])],ignore_index = True)).transpose()
-            growthcurves        = (pd.DataFrame(firstline)).transpose()
-            growthcurveserr     = (pd.DataFrame(firstline)).transpose()
-            growthcurvesder     = (pd.DataFrame(firstline)).transpose()
-            growthcurvesdererr  = (pd.DataFrame(firstline)).transpose()       
-        else:    
-            growthratesin           = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr])],ignore_index = True)).transpose()
-            growthrates         = pd.concat([growthrates,growthratesin],ignore_index = True)
-
-        growthcurvesin          = (pd.concat([labels,pd.DataFrame(fitcurve)],ignore_index = True)).transpose()
-        growthcurveserrin       = (pd.concat([labels,pd.DataFrame(fitcurveerr)],ignore_index = True)).transpose()
-        growthcurvesderin       = (pd.concat([labels,pd.DataFrame(fitdercurve)],ignore_index = True)).transpose()
-        growthcurvesdererrin    = (pd.concat([labels,pd.DataFrame(fitdercurveerr)],ignore_index = True)).transpose()
-        
-        growthcurves        = pd.concat([growthcurves,growthcurvesin],ignore_index = True)
-        growthcurveserr     = pd.concat([growthcurveserr,growthcurveserrin],ignore_index = True)
-        growthcurvesder     = pd.concat([growthcurvesder,growthcurvesderin],ignore_index = True)
-        growthcurvesdererr  = pd.concat([growthcurvesdererr,growthcurvesdererrin],ignore_index = True)    
-
+                od = infile.iloc[i]
+                od = od[labelcols+1:]
+                
+                labels = infile.iloc[i,0:labelcols]
+                labels = labels.copy()
+                # Converts columns to float format for fitderiv    
+                odfloat = np.array(od,dtype='float64')  
+            
+            # Removes nans from data that matlab put in
+            datalength = odfloat.shape[-1]
+            t = time[:datalength]
+            
+            # Check for growth
+            diff = np.amax(np.ndarray.flatten(odfloat))-np.amin(np.ndarray.flatten(odfloat))
+            
+            if diff > growthmin: 
+                # Runs fitderiv only if growth is over 0.05
+                for attemptno in range(5):
+                    try:
+                        fitty = fitderiv(t,np.transpose(odfloat),bd= fitparams,exitearly= False,nosamples= nosamples, noruns= noruns) # Peters program
+                        break
+                    except KeyboardInterrupt:
+                        raise
+                    except:
+                        if attemptno == 4:
+                            pass
+                Gr = fitty.ds['max df']
+                Err = fitty.ds['max df var']
+                Lag = fitty.ds['lag time']
+                TimeofmaxGr = fitty.ds['time of max df']
+                note = ["Normal"]
+                
+                fitcurve = fitty.f
+                fitcurveerr = fitty.fvar
+                fitdercurve = fitty.df
+                fitdercurveerr = fitty.dfvar
+                functime = fitty.t
+                
+                if makeplots:
+                    plt.figure()
+                    plt.subplot(2,1,1)
+                    plt.plot(functime,fitty.d,'r.')
+                    plt.plot(functime,fitcurve,'b')
+                    plt.ylabel('log OD')
+                    plt.xlabel('Time [h]')
+                    plt.subplot(2,1,2)
+                    plt.plot(functime,fitdercurve,'b')
+                    plt.fill_between(functime, fitdercurve-np.sqrt(fitdercurveerr),fitdercurve+np.sqrt(fitdercurveerr), facecolor= 'blue', alpha=0.2)
+                    plt.ylabel('GR [Hr$^{-1}$]')
+                    plt.xlabel('Time [h]')
+    
+                    if replicates:
+                        picname = str(infile.iloc[i,replicols])
+                    elif predefinedinput == 'BMG':
+                        picname = str(infile.iloc[i,0]) + str(int(infile.iloc[i,1]))
+                    else:
+                        picname = str(infile.iloc[i,0])
+                    picname = filepath + '/plots/' + picname + '.PNG'
+                    plt.savefig(picname)
+                    if showplots:
+                        plt.show()
+                            
+            else:
+                # Returns no growth if none detected
+                Gr = 0
+                Err = 0
+                Lag = 0
+                note = ["No Growth"]
+                TimeofmaxGr = 0
+                
+                fitcurve = np.zeros(datalength)
+                fitcurveerr = np.zeros(datalength)
+                fitdercurve = np.zeros(datalength)
+                fitdercurveerr = np.zeros(datalength)
+                if diff == 0:
+                    print("Empty well, skipping analysis.")
+                else:
+                    print("No growth found! Less than " + str(growthmin) + ' change in OD detected')
+            
+            # Sticks into the output variable (allows individual debugging)
+            
+            if i == 1:
+                growthrates         = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr])],ignore_index = True)).transpose()
+                growthcurves        = (pd.DataFrame(firstline)).transpose()
+                growthcurveserr     = (pd.DataFrame(firstline)).transpose()
+                growthcurvesder     = (pd.DataFrame(firstline)).transpose()
+                growthcurvesdererr  = (pd.DataFrame(firstline)).transpose()       
+            else:    
+                growthratesin           = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr])],ignore_index = True)).transpose()
+                growthrates         = pd.concat([growthrates,growthratesin],ignore_index = True)
+    
+            growthcurvesin          = (pd.concat([labels,pd.DataFrame(fitcurve)],ignore_index = True)).transpose()
+            growthcurveserrin       = (pd.concat([labels,pd.DataFrame(fitcurveerr)],ignore_index = True)).transpose()
+            growthcurvesderin       = (pd.concat([labels,pd.DataFrame(fitdercurve)],ignore_index = True)).transpose()
+            growthcurvesdererrin    = (pd.concat([labels,pd.DataFrame(fitdercurveerr)],ignore_index = True)).transpose()
+            
+            growthcurves        = pd.concat([growthcurves,growthcurvesin],ignore_index = True)
+            growthcurveserr     = pd.concat([growthcurveserr,growthcurveserrin],ignore_index = True)
+            growthcurvesder     = pd.concat([growthcurvesder,growthcurvesderin],ignore_index = True)
+            growthcurvesdererr  = pd.concat([growthcurvesdererr,growthcurvesdererrin],ignore_index = True)   
+    except:
+        if i>1:
+            Outputname = os.path.join(filepath, filename + ' Analysed.xlsx')
+            writer = pd.ExcelWriter(Outputname, engine='xlsxwriter')
+            growthrates.to_excel(writer, sheet_name='Stats')
+            growthcurves.to_excel(writer, sheet_name='fit')
+            growthcurveserr.to_excel(writer, sheet_name='fit err')
+            growthcurvesder.to_excel(writer, sheet_name='Derivative')
+            growthcurvesdererr.to_excel(writer, sheet_name='Derivative err')
+            writer.save()
+        pass
+            
     varnames = ['Row','Column','Note','GR','GR Err', 'Lag', 'Time of max GR']
     growthrates.columns = varnames        
         
@@ -236,16 +255,20 @@ def cleannonreps(indata, replicol, repignore):
         cols = indata.iloc[:,replicol]
         a = np.array(cols)
         for i in range(cols.size): 
-            if re.match(repignore,cols[i]):
+            try:
+                if re.match(repignore,cols[i]):
+                    a[i]= False
+                else:
+                    a[i]= True
+            except:
+                print('WARNING: unparsable replicate label, skipping')
                 a[i]= False
-            else:
-                a[i]= True
         indata = (indata.loc[a]).copy()
     return indata
             
             
 def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
-    files = glob(os.path.join(filedirectory + '*.csv'))
+    files = (glob(os.path.join(filedirectory + '*.csv'))) + (glob(os.path.join(filedirectory + '*.CSV')))
         
     # First need to determine minimum file length to use as first input
     lengths = np.array(np.zeros([np.shape(files)[0],1]),dtype='int')
