@@ -61,12 +61,17 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
         dataheight = uniquereps.shape[0]
         datalength = infile.shape[1]
         firstline = infile.iloc[0]
+        
+        print('++++++++++ Found '+str(dataheight)+' replicates ++++++++++')
+        for x in uniquereps: print(x)
+        sys.stdout.flush()
     else:
         infile = pd.read_csv(filename, header=header, skiprows=skiprows)
         infile = infile.iloc[:,0:-1]
         filepath = os.path.split(filename)[0]
         filename = os.path.split(filename)[1]
-        filepath = os.path.join(filepath, filename.split('.')[-2] + ' outputdata')
+        filename = filename.split('.')[-2]
+        filepath = os.path.join(filepath, filename + ' outputdata')
         if waterwells:
             infile = removewaterwells(infile,labelcols)    
         
@@ -87,11 +92,27 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
     time = infile.iloc[0]
     time = time.iloc[labelcols:]
     time = np.float64(time)
+    
+    # sanity check time
+    timecheck = np.gradient(time)
+    if any(timecheck<0):
+        print('Time does not always increase along its length!!!')
+        print('Estimating missing values')
+        timegradient = np.diff(time)
+        meanstep = np.mean(timegradient[0:10])
+        
+        for i in range(len(time)-1):
+            if abs(time[i]-time[i+1]) > meanstep*1.5:
+                time[i+1] = time[i] + meanstep
+    
     try:
         for i in range(1,dataheight+1):
-            location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
-            print(location)     
-            sys.stdout.flush()
+            if replicates:
+                location = '++++++++++ Processing replicate set ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
+                print(location)
+            else:
+                location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
+                print(location) 
             if replicates:
                 repset = uniquereps[i-1]
                 repselection = repset == infile.iloc[:,replicols]
@@ -102,6 +123,8 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 # Converts columns to float format for fitderiv    
                 odfloat = np.array(od,dtype='float64')  
                 odfloat = alignreplicates(odfloat, normalise, alignvalue)
+                repinfo = 'Fitting ' + str(odfloat.shape[0]) + ' replicates'
+                print(repinfo)
                 
             else:
                 od = infile.iloc[i]
@@ -111,7 +134,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 labels = labels.copy()
                 # Converts columns to float format for fitderiv    
                 odfloat = np.array(od,dtype='float64')  
-            
+            sys.stdout.flush()
             # Removes nans from data that matlab put in
             datalength = odfloat.shape[-1]
             t = time[:datalength]
@@ -127,8 +150,8 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                     except KeyboardInterrupt:
                         raise(KeyboardInterrupt)
                     except:
-                        if attemptno == 4:
-                            raise
+                        #if attemptno == 4:
+                        raise
                 Gr = fitty.ds['max df']
                 Err = fitty.ds['max df var']
                 Lag = fitty.ds['lag time']
@@ -155,7 +178,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                     plt.xlabel('Time [h]')
     
                     if replicates:
-                        picname = str(infile.iloc[i,replicols])
+                        picname = labels[-1]
                     elif predefinedinput == 'BMG':
                         picname = str(infile.iloc[i,0]) + str(int(infile.iloc[i,1]))
                     else:
@@ -264,11 +287,13 @@ def cleannonreps(indata, replicol, repignore):
                 a[i]= False
                 pass
         indata = (indata.loc[a]).copy()
+        
+      
     return indata
             
             
 def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
-    files = (glob(os.path.join(filedirectory + '*.csv'))) + (glob(os.path.join(filedirectory + '*.CSV')))
+    files = glob(os.path.join(filedirectory, '*.[cC][sS][vV]'))
         
     # First need to determine minimum file length to use as first input
     lengths = np.array(np.zeros([np.shape(files)[0],1]),dtype='int')
