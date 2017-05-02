@@ -65,8 +65,23 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
         print('++++++++++ Found '+str(dataheight)+' replicates ++++++++++')
         for x in uniquereps: print(x)
         sys.stdout.flush()
+    elif os.path.isdir(filename):
+        files = glob(os.path.join(filename, '*.[cC][sS][vV]')) + glob(os.path.join(filename, '*.[xX][lL][sS][xX]'))
+        print('++++++++++Detected folder. Processing ' + str(len(files)) + ' files++++++++++')
+        for i in range(0,len(files)):
+            filename = files[i]
+            print('++++++++++ Processing file ++++++++++')
+            print(filename)
+            curvefitter(filename, header, predefinedinput, skiprows, labelcols, replicols, 
+                      waterwells, replicates, repignore, normalise, growthmin, alignvalue,
+                      fitparams, noruns, nosamples, makeplots, showplots)
+        return
     else:
-        infile = pd.read_csv(filename, header=header, skiprows=skiprows)
+        try:
+            infile = pd.read_csv(filename, header=header, skiprows=skiprows)
+        except pd.parser.CParserError:
+            infile = pd.read_excel(filename, header=header, skiprows=skiprows)
+        
         infile = infile.iloc[:,0:-1]
         filepath = os.path.split(filename)[0]
         filename = os.path.split(filename)[1]
@@ -140,8 +155,18 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             t = time[:datalength]
             
             # Check for growth
-            diff = np.amax(np.ndarray.flatten(odfloat))-np.amin(np.ndarray.flatten(odfloat))
-            if diff > growthmin: 
+            #diff = np.amax(np.ndarray.flatten(odfloat))-np.amin(np.ndarray.flatten(odfloat))
+            odfloat2 = np.ndarray.flatten(odfloat)
+            growthminnorm = np.amin(odfloat2) + growthmin
+                
+            for ii in range(0,odfloat2.shape[0]-3):
+                if (odfloat2[ii]> growthminnorm) & (odfloat2[ii+1]> growthminnorm) & (odfloat2[ii+2]> growthminnorm):
+                    diff = True
+                    break
+                else:
+                    diff = False
+            
+            if diff: 
                 # Runs fitderiv only if growth is over 0.05
                 for attemptno in range(5):
                     try:
@@ -150,8 +175,8 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                     except KeyboardInterrupt:
                         raise(KeyboardInterrupt)
                     except:
-                        #if attemptno == 4:
-                        raise
+                        if attemptno == 4:
+                            raise
                 Gr = fitty.ds['max df']
                 Err = fitty.ds['max df var']
                 Lag = fitty.ds['lag time']
@@ -178,12 +203,13 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                     plt.xlabel('Time [h]')
     
                     if replicates:
-                        picname = labels[-1]
+                        picname = labels.iloc[-1]
                     elif predefinedinput == 'BMG':
-                        picname = str(infile.iloc[i,0]) + str(int(infile.iloc[i,1]))
+                        picname = labels.iloc[0] + str(labels.iloc[1])
                     else:
-                        picname = str(infile.iloc[i,0])
-                    picname = filepath + '/plots/' + picname + '.PNG'
+                        picname = str(labels.iloc[i,0])
+                    picname = picname + '.PNG'
+                    picname = os.path.join(filepath, 'plots',picname)
                     plt.savefig(picname)
                     if showplots:
                         plt.show()
@@ -200,10 +226,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 fitcurveerr = np.zeros(datalength)
                 fitdercurve = np.zeros(datalength)
                 fitdercurveerr = np.zeros(datalength)
-                if diff == 0:
-                    print("Empty well, skipping analysis.")
-                else:
-                    print("No growth found! Less than " + str(growthmin) + ' change in OD detected')
+                print("No growth found! Less than " + str(growthmin) + ' change in OD detected')
             
             # Sticks into the output variable (allows individual debugging)
             
@@ -214,7 +237,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 growthcurvesder     = (pd.DataFrame(firstline)).transpose()
                 growthcurvesdererr  = (pd.DataFrame(firstline)).transpose()       
             else:    
-                growthratesin           = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr])],ignore_index = True)).transpose()
+                growthratesin          = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr])],ignore_index = True)).transpose()
                 growthrates         = pd.concat([growthrates,growthratesin],ignore_index = True)
     
             growthcurvesin          = (pd.concat([labels,pd.DataFrame(fitcurve)],ignore_index = True)).transpose()
@@ -249,7 +272,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
     growthcurvesder.to_excel(writer, sheet_name='Derivative')
     growthcurvesdererr.to_excel(writer, sheet_name='Derivative err')
     writer.save()
-    
+    return
     
     
 def removewaterwells(indata,labelcols,deletewells=1):
@@ -294,7 +317,7 @@ def cleannonreps(indata, replicol, repignore):
             
 def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
     files = glob(os.path.join(filedirectory, '*.[cC][sS][vV]'))
-        
+    print('++++++++++ Found '+ str(len(files)) +' files ++++++++++')
     # First need to determine minimum file length to use as first input
     lengths = np.array(np.zeros([np.shape(files)[0],1]),dtype='int')
     for i in range(0,(len(files))):
