@@ -38,14 +38,14 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
     showplots; displays plots during processing
     '''
     
-    if (predefinedinput == 'BMG'):
+    if (predefinedinput == 'BMG'): # For BMG output from TP lab reader
         skiprows= 6
         labelcols = 3
         replicols = 3
         repignore = 'Sample X*'
-
         
     replicols = replicols-1 # convers to index from number
+    
     # Process files before inputting
     filename = os.path.realpath(filename)
     if replicates & os.path.isdir(filename)==True:
@@ -57,7 +57,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
         reps = infile.iloc[1:,replicols]
         uniquereps = np.unique(reps)
         
-        # Provide info about datashape
+        # Provide info about datashape for interation to use
         dataheight = uniquereps.shape[0]
         datalength = infile.shape[1]
         firstline = infile.iloc[0]
@@ -72,6 +72,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             filename = files[i]
             print('++++++++++ Processing file ++++++++++')
             print(filename)
+            # Yay recursion
             curvefitter(filename, header, predefinedinput, skiprows, labelcols, replicols, 
                       waterwells, replicates, repignore, normalise, growthmin, alignvalue,
                       fitparams, noruns, nosamples, makeplots, showplots)
@@ -158,7 +159,8 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             #diff = np.amax(np.ndarray.flatten(odfloat))-np.amin(np.ndarray.flatten(odfloat))
             odfloat2 = np.ndarray.flatten(odfloat)
             growthminnorm = np.amin(odfloat2) + growthmin
-                
+             
+            # Looks for growth by three consecutive values over growthmin 
             for ii in range(0,odfloat2.shape[0]-3):
                 if (odfloat2[ii]> growthminnorm) & (odfloat2[ii+1]> growthminnorm) & (odfloat2[ii+2]> growthminnorm):
                     diff = True
@@ -167,7 +169,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                     diff = False
             
             if diff: 
-                # Runs fitderiv only if growth is over 0.05
+                # Runs fitderiv only if growth is over growthmin
                 for attemptno in range(5):
                     try:
                         fitty = fitderiv(t,np.transpose(odfloat),bd= fitparams,exitearly= False,nosamples= nosamples, noruns= noruns) # Peters program
@@ -177,12 +179,12 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                     except:
                         if attemptno == 4:
                             raise
+                # Pulls stats and data from Peters routine
                 Gr = fitty.ds['max df']
                 Err = fitty.ds['max df var']
                 Lag = fitty.ds['lag time']
                 TimeofmaxGr = fitty.ds['time of max df']
                 note = ["Normal"]
-                
                 fitcurve = fitty.f
                 fitcurveerr = fitty.fvar
                 fitdercurve = fitty.df
@@ -251,6 +253,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             growthcurvesdererr  = pd.concat([growthcurvesdererr,growthcurvesdererrin],ignore_index = True)   
     except:
         if i>1:
+            # Dumps currently analysed data to file in case of error
             Outputname = os.path.join(filepath, filename + ' Analysed.xlsx')
             writer = pd.ExcelWriter(Outputname, engine='xlsxwriter')
             growthrates.to_excel(writer, sheet_name='Stats')
@@ -294,6 +297,7 @@ def removewaterwells(indata,labelcols,deletewells=1):
     
     
 def cleannonreps(indata, replicol, repignore):
+    # Removes wells matching a particular regex
     if repignore == None:
         return indata
     if isinstance(repignore,str):
@@ -310,7 +314,6 @@ def cleannonreps(indata, replicol, repignore):
                 a[i]= False
                 pass
         indata = (indata.loc[a]).copy()
-        
       
     return indata
             
@@ -326,7 +329,7 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
     
     minlength = np.amin(lengths)
     
-    # Assembles all files into a single large dataset
+    # Assembles all files into a single large dataset, dropping any longer than minlength
     for i in range(0,(len(files))):
         if i == 0:
             stackfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
