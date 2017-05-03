@@ -126,10 +126,6 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             if replicates:
                 location = '++++++++++ Processing replicate set ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
                 print(location)
-            else:
-                location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
-                print(location) 
-            if replicates:
                 repset = uniquereps[i-1]
                 repselection = repset == infile.iloc[:,replicols]
                 od = infile.loc[repselection]
@@ -142,7 +138,16 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 repinfo = 'Fitting ' + str(odfloat.shape[0]) + ' replicates'
                 print(repinfo)
                 
+                nantest = np.isnan(odfloat)
+                for ii in range(0,nantest.shape[1]):
+                    if any(nantest[:,ii]):
+                        x = ii-1
+                        break
+                odfloat = odfloat[:,:ii]
+                t = time[:ii]
             else:
+                location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
+                print(location) 
                 od = infile.iloc[i]
                 od = od[labelcols+1:]
                 
@@ -150,10 +155,14 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 labels = labels.copy()
                 # Converts columns to float format for fitderiv    
                 odfloat = np.array(od,dtype='float64')  
-            sys.stdout.flush()
-            # Removes nans from data that matlab put in
-            datalength = odfloat.shape[-1]
-            t = time[:datalength]
+                nantest = np.isnan(odfloat)
+                for ii in range(0,len(nantest)):
+                    if nantest[ii]:
+                        x = ii-1
+                        break
+                odfloat = odfloat[:ii]
+                t = time[:ii]
+            sys.stdout.flush() # Forces prints to display immediately
             
             # Check for growth
             #diff = np.amax(np.ndarray.flatten(odfloat))-np.amin(np.ndarray.flatten(odfloat))
@@ -321,29 +330,50 @@ def cleannonreps(indata, replicol, repignore):
 def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
     files = glob(os.path.join(filedirectory, '*.[cC][sS][vV]'))
     print('++++++++++ Found '+ str(len(files)) +' files ++++++++++')
-    # First need to determine minimum file length to use as first input
-    lengths = np.array(np.zeros([np.shape(files)[0],1]),dtype='int')
-    for i in range(0,(len(files))):
-        testfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
-        lengths[i] = testfile.shape[1]
     
-    minlength = np.amin(lengths)
-    
-    # Assembles all files into a single large dataset, dropping any longer than minlength
+    # First need to determine max time length to use as first input
     for i in range(0,(len(files))):
         if i == 0:
-            stackfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
-            if stackfile.shape[1] > minlength:
-                stackfile = stackfile.iloc[:,0:minlength-1]
-                
+            testfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
+            time = testfile.iloc[0,:]
         else:
-            newfile = pd.read_csv(files[i], header= header, skiprows= skiprows+1)
-            if newfile.shape[1] > minlength:
-                newfile = newfile.iloc[:,0:minlength-1]
-            stack = [stackfile,newfile]
-            stackfile = pd.concat(stack,ignore_index = True)
+            testfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
+            if testfile.shape[1] > len(time):
+                time = testfile.iloc[0,:]
+                time = pd.DataFrame(time)
+    
+    stackfile = time.transpose()
+    
+    for i in range(0,len(files)):
+        newfile = pd.read_csv(files[i], header= header, skiprows= skiprows+1)
+        stackfile = stackfile.append(newfile, ignore_index=True)
+            
     if waterwells:
         removewaterwells(stackfile,labelcols)
+    
+#    # First need to determine minimum file length to use as first input
+#    lengths = np.array(np.zeros([np.shape(files)[0],1]),dtype='int')
+#    for i in range(0,(len(files))):
+#        testfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
+#        lengths[i] = testfile.shape[1]
+#    
+#    minlength = np.amin(lengths)
+#    
+#    # Assembles all files into a single large dataset, dropping any longer than minlength
+#    for i in range(0,(len(files))):
+#        if i == 0:
+#            stackfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
+#            if stackfile.shape[1] > minlength:
+#                stackfile = stackfile.iloc[:,0:minlength-1]
+#                
+#        else:
+#            newfile = pd.read_csv(files[i], header= header, skiprows= skiprows+1)
+#            if newfile.shape[1] > minlength:
+#                newfile = newfile.iloc[:,0:minlength-1]
+#            stack = [stackfile,newfile]
+#            stackfile = pd.concat(stack,ignore_index = True)
+#    if waterwells:
+#        removewaterwells(stackfile,labelcols)
     return stackfile
     
     
