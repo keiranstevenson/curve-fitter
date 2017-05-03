@@ -65,6 +65,30 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
         print('++++++++++ Found '+str(dataheight)+' replicates ++++++++++')
         for x in uniquereps: print(x)
         sys.stdout.flush()
+        
+    elif replicates & os.path.isfile(filename):
+        try:
+            infile = pd.read_csv(filename, header=header, skiprows=skiprows)
+        except pd.parser.CParserError:
+            infile = pd.read_excel(filename, header=header, skiprows=skiprows)
+
+        infile = cleannonreps(infile, replicols, repignore)
+        reps = infile.iloc[1:,replicols]
+        uniquereps = np.unique(reps)            
+        
+        dataheight = uniquereps.shape[0]
+        datalength = infile.shape[1]
+        firstline = infile.iloc[0]
+        
+        print('++++++++++ Found '+str(dataheight)+' replicates ++++++++++')
+        for x in uniquereps: print(x)
+        sys.stdout.flush()
+            
+        filepath = os.path.split(filename)[0]
+        filename = os.path.split(filename)[1]
+        filename = filename.split('.')[-2]
+        filepath = os.path.join(filepath, filename + ' outputdata')
+        
     elif os.path.isdir(filename):
         files = glob(os.path.join(filename, '*.[cC][sS][vV]')) + glob(os.path.join(filename, '*.[xX][lL][sS][xX]'))
         print('++++++++++Detected folder. Processing ' + str(len(files)) + ' files++++++++++')
@@ -77,13 +101,13 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                       waterwells, replicates, repignore, normalise, growthmin, alignvalue,
                       fitparams, noruns, nosamples, makeplots, showplots)
         return
-    else:
+        
+    elif os.path.isfile(filename):
         try:
             infile = pd.read_csv(filename, header=header, skiprows=skiprows)
         except pd.parser.CParserError:
             infile = pd.read_excel(filename, header=header, skiprows=skiprows)
         
-        infile = infile.iloc[:,0:-1]
         filepath = os.path.split(filename)[0]
         filename = os.path.split(filename)[1]
         filename = filename.split('.')[-2]
@@ -95,6 +119,8 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
         dataheight = infile.shape[0]-1 #ignore time row
         datalength = infile.shape[1]
         firstline = infile.iloc[0]
+    else:
+        raise FileNotFoundError('File or directory not found')
 
     infile = normalisetraces(infile, normalise, labelcols)
     # Checks and makes output directories
@@ -112,7 +138,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
     # sanity check time
     timecheck = np.gradient(time)
     if any(timecheck<0):
-        print('Time does not always increase along its length!!!')
+        print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \nTime does not always increase along its length \n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         print('Estimating missing values')
         timegradient = np.diff(time)
         meanstep = np.mean(timegradient[0:10])
@@ -184,7 +210,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                         fitty = fitderiv(t,np.transpose(odfloat),bd= fitparams,exitearly= False,nosamples= nosamples, noruns= noruns) # Peters program
                         break
                     except KeyboardInterrupt:
-                        raise(KeyboardInterrupt)
+                        raise KeyboardInterrupt('User aborted run')
                     except:
                         if attemptno == 4:
                             raise
@@ -240,7 +266,6 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 print("No growth found! Less than " + str(growthmin) + ' change in OD detected')
             
             # Sticks into the output variable (allows individual debugging)
-            
             if i == 1:
                 growthrates         = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr])],ignore_index = True)).transpose()
                 growthcurves        = (pd.DataFrame(firstline)).transpose()
@@ -262,6 +287,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             growthcurvesdererr  = pd.concat([growthcurvesdererr,growthcurvesdererrin],ignore_index = True)   
     except:
         if i>1:
+            print('ERROR DURING FIT: DUMPING DATA TO OUTPUT FILE')
             # Dumps currently analysed data to file in case of error
             Outputname = os.path.join(filepath, filename + ' Analysed.xlsx')
             writer = pd.ExcelWriter(Outputname, engine='xlsxwriter')
@@ -323,7 +349,6 @@ def cleannonreps(indata, replicol, repignore):
                 a[i]= False
                 pass
         indata = (indata.loc[a]).copy()
-      
     return indata
             
             
@@ -350,30 +375,6 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
             
     if waterwells:
         removewaterwells(stackfile,labelcols)
-    
-#    # First need to determine minimum file length to use as first input
-#    lengths = np.array(np.zeros([np.shape(files)[0],1]),dtype='int')
-#    for i in range(0,(len(files))):
-#        testfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
-#        lengths[i] = testfile.shape[1]
-#    
-#    minlength = np.amin(lengths)
-#    
-#    # Assembles all files into a single large dataset, dropping any longer than minlength
-#    for i in range(0,(len(files))):
-#        if i == 0:
-#            stackfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
-#            if stackfile.shape[1] > minlength:
-#                stackfile = stackfile.iloc[:,0:minlength-1]
-#                
-#        else:
-#            newfile = pd.read_csv(files[i], header= header, skiprows= skiprows+1)
-#            if newfile.shape[1] > minlength:
-#                newfile = newfile.iloc[:,0:minlength-1]
-#            stack = [stackfile,newfile]
-#            stackfile = pd.concat(stack,ignore_index = True)
-#    if waterwells:
-#        removewaterwells(stackfile,labelcols)
     return stackfile
     
     

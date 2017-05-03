@@ -19,4 +19,7 @@ cfit(filename, predefinedinput= 'BMG', noruns=1, nosamples=5, replicates=True, w
 filename = 'Datafiles/'
 cfit(filename, predefinedinput= 'BMG', noruns=1, nosamples=5, waterwells=True)
 
+filename = 'Datafiles/Alextest/Alextest25.csv'
+cfit(filename, predefinedinput= 'BMG', noruns=1, nosamples=5, replicates=True, waterwells=True)
+
 print('YAY')
