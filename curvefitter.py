@@ -353,7 +353,7 @@ def cleannonreps(indata, replicol, repignore):
             
             
 def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
-    files = glob(os.path.join(filedirectory, '*.[cC][sS][vV]'))
+    files = glob(os.path.join(filedirectory, '*.[cC][sS][vV]')) + glob(os.path.join(filedirectory, '*.[xX][lL][sS][xX]'))
     print('++++++++++ Found '+ str(len(files)) +' files ++++++++++')
     
     # First need to determine max time length to use as first input
@@ -361,6 +361,7 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
         if i == 0:
             testfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
             time = testfile.iloc[0,:]
+            time = pd.DataFrame(time)
         else:
             testfile = pd.read_csv(files[i], header= header, skiprows= skiprows)
             if testfile.shape[1] > len(time):
