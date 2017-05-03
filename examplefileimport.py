@@ -7,19 +7,19 @@ Created on Mon Jun 13 16:09:32 2016
  
 from curvefitter import curvefitter as cfit
 
-filename = 'Datafiles/Alextest/'
-cfit(filename, predefinedinput= 'BMG', noruns=1, nosamples=5, replicates=True, waterwells=True)
+#filename = 'Datafiles/Alextest/'
+#cfit(filename, predefinedinput= 'BMG', noruns=1, nosamples=5, replicates=True, waterwells=True)
 
 #filename = 'Datafiles/truncatedtest.CSV'
-#cfit(filename, predefinedinput= 'BMG', noruns=1, nosamples=5, waterwells=True)
+#cfit(filename, predefinedinput= 'BMG', waterwells=True)
 
 #filename = 'Datafiles/EtOHtestdata.csv'
-#cfit(filename, predefinedinput= 'BMG', noruns=1, nosamples=5, waterwells=True)
+#cfit(filename, predefinedinput= 'BMG', waterwells=True)
 
 filename = 'Datafiles/'
-cfit(filename, predefinedinput= 'BMG', noruns=1, nosamples=5, waterwells=True)
+cfit(filename, predefinedinput= 'BMG', waterwells=True)
 
-filename = 'Datafiles/Alextest/Alextest25.csv'
-cfit(filename, predefinedinput= 'BMG', noruns=1, nosamples=5, replicates=True, waterwells=True)
+#filename = 'Datafiles/Alextest/Alextest25.csv'
+#cfit(filename, predefinedinput= 'BMG', noruns=1, nosamples=5, replicates=True, waterwells=True)
 
 print('YAY')
