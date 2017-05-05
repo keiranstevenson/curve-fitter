@@ -13,7 +13,7 @@ import os
 from glob import glob
 import re
 import sys
-
+import platform
 
 def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, labelcols= 3, replicols= 3, 
                       waterwells= False, replicates= False, repignore= None, normalise= 0.05, growthmin= 0.05, alignvalue= 0.1,
@@ -211,7 +211,17 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                         break
                     except KeyboardInterrupt:
                         raise KeyboardInterrupt('User aborted run')
+                    except MemoryError:
+                        version = platform.architecture()[0]
+                        if version == '32bit':
+                            raise MemoryError('Out of Memory while fitting. Try installing 64-bit python or using fewer replicates')
+                        elif version == '64bit':
+                            raise MemoryError('Out of memory while fitting. Try using fewer replicates')
+                        else:
+                            raise MemoryError('Out of memory while fitting. Unable to determine version, try making more memory available or using fewer replicates')
+                            
                     except:
+                        print('Fitting failure, retrying')
                         if attemptno == 4:
                             raise
                 # Pulls stats and data from Peters routine
@@ -243,8 +253,11 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                         picname = labels.iloc[-1]
                     elif predefinedinput == 'BMG':
                         picname = labels.iloc[0] + str(labels.iloc[1])
+                    elif len(labels) == 1:
+                        picname = str(labels.iloc[0])
                     else:
-                        picname = str(labels.iloc[i,0])
+                        picname = labels.astype('str')
+                        picname = picname.str.cat()
                     picname = picname + '.PNG'
                     picname = os.path.join(filepath, 'plots',picname)
                     plt.savefig(picname)
@@ -285,10 +298,16 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             growthcurveserr     = pd.concat([growthcurveserr,growthcurveserrin],ignore_index = True)
             growthcurvesder     = pd.concat([growthcurvesder,growthcurvesderin],ignore_index = True)
             growthcurvesdererr  = pd.concat([growthcurvesdererr,growthcurvesdererrin],ignore_index = True)   
+    except KeyboardInterrupt:
+        raise
     except:
-        if i>1:
-            print('ERROR DURING FIT: DUMPING DATA TO OUTPUT FILE')
-            # Dumps currently analysed data to file in case of error
+        print('ERROR DURING FIT: DUMPING DATA TO OUTPUT FILE') 
+        raise
+    finally:
+        if 'growthrates' in locals():
+            varnames = ['Row','Column','Note','GR','GR Err', 'Lag', 'Time of max GR']
+            growthrates.columns = varnames        
+                
             Outputname = os.path.join(filepath, filename + ' Analysed.xlsx')
             writer = pd.ExcelWriter(Outputname, engine='xlsxwriter')
             growthrates.to_excel(writer, sheet_name='Stats')
@@ -297,19 +316,6 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             growthcurvesder.to_excel(writer, sheet_name='Derivative')
             growthcurvesdererr.to_excel(writer, sheet_name='Derivative err')
             writer.save()
-        raise
-            
-    varnames = ['Row','Column','Note','GR','GR Err', 'Lag', 'Time of max GR']
-    growthrates.columns = varnames        
-        
-    Outputname = os.path.join(filepath, filename + ' Analysed.xlsx')
-    writer = pd.ExcelWriter(Outputname, engine='xlsxwriter')
-    growthrates.to_excel(writer, sheet_name='Stats')
-    growthcurves.to_excel(writer, sheet_name='fit')
-    growthcurveserr.to_excel(writer, sheet_name='fit err')
-    growthcurvesder.to_excel(writer, sheet_name='Derivative')
-    growthcurvesdererr.to_excel(writer, sheet_name='Derivative err')
-    writer.save()
     return
     
     
