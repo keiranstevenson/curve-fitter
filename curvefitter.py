@@ -120,7 +120,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
         datalength = infile.shape[1]
         firstline = infile.iloc[0]
     else:
-        raise FileNotFoundError('File or directory not found')
+        raise ImportError('File or directory not found')
 
     infile = normalisetraces(infile, normalise, labelcols)
     # Checks and makes output directories
@@ -155,14 +155,17 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 repset = uniquereps[i-1]
                 repselection = repset == infile.iloc[:,replicols]
                 od = infile.loc[repselection]
-                labels = od.iloc[0,0:labelcols]
-                labels = labels.copy()
+                # Defines names for results
+                labels = repset
+                repinfo1 = 'Fitting ' + repset
+                print(repinfo1)
+                
                 od = (od.iloc[:,labelcols:]).copy()
                 # Converts columns to float format for fitderiv    
                 odfloat = np.array(od,dtype='float64')  
                 odfloat = alignreplicates(odfloat, normalise, alignvalue)
-                repinfo = 'Fitting ' + str(odfloat.shape[0]) + ' replicates'
-                print(repinfo)
+                repinfo2 = 'Found ' + str(odfloat.shape[0]) + ' replicates'
+                print(repinfo2)
                 
                 nantest = np.isnan(odfloat)
                 for ii in range(0,nantest.shape[1]):
@@ -176,9 +179,10 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 print(location) 
                 od = infile.iloc[i]
                 od = od[labelcols+1:]
-                
+                # Defines names for results                
                 labels = infile.iloc[i,0:labelcols]
                 labels = labels.copy()
+                
                 # Converts columns to float format for fitderiv    
                 odfloat = np.array(od,dtype='float64')  
                 nantest = np.isnan(odfloat)
@@ -191,17 +195,12 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             sys.stdout.flush() # Forces prints to display immediately
             
             # Check for growth
-            #diff = np.amax(np.ndarray.flatten(odfloat))-np.amin(np.ndarray.flatten(odfloat))
-            odfloat2 = np.ndarray.flatten(odfloat)
-            growthminnorm = np.amin(odfloat2) + growthmin
-             
-            # Looks for growth by three consecutive values over growthmin 
-            for ii in range(0,odfloat2.shape[0]-3):
-                if (odfloat2[ii]> growthminnorm) & (odfloat2[ii+1]> growthminnorm) & (odfloat2[ii+2]> growthminnorm):
-                    diff = True
-                    break
-                else:
-                    diff = False
+            diff = checkforgrowth(odfloat,growthmin)
+            if type(diff) == list:
+                invdiff = [not x for x in diff]
+                if np.any(invdiff) & replicates:
+                    print('Error, no growth detected in replicate, dropping from analysis')
+                    odfloat = odfloat[diff,:]
             
             if diff: 
                 # Runs fitderiv only if growth is over growthmin
@@ -250,11 +249,11 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                     plt.xlabel('Time [h]')
     
                     if replicates:
-                        picname = labels.iloc[-1]
+                        picname = labels
                     elif predefinedinput == 'BMG':
                         picname = labels.iloc[0] + str(labels.iloc[1])
                     elif len(labels) == 1:
-                        picname = str(labels.iloc[0])
+                        picname = (labels.iloc[0]).encode('utf-8')
                     else:
                         picname = labels.astype('str')
                         picname = picname.str.cat()
@@ -262,7 +261,10 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                     picname = os.path.join(filepath, 'plots',picname)
                     plt.savefig(picname)
                     if showplots:
+                        plt.ion()
                         plt.show()
+                    else:
+                        plt.close()
                             
             else:
                 # Returns no growth if none detected
@@ -304,6 +306,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
         print('ERROR DURING FIT: DUMPING DATA TO OUTPUT FILE') 
         raise
     finally:
+        # Always runs data saving in case of error
         if 'growthrates' in locals():
             varnames = ['Row','Column','Note','GR','GR Err', 'Lag', 'Time of max GR']
             growthrates.columns = varnames        
@@ -429,3 +432,31 @@ def alignreplicates(dataset, normvalue= 0.05, alignvalue= 0.1):
             stack= np.vstack((stack,newdata))
     return stack
 
+def checkforgrowth(data, growthmin):
+    try:
+        test = range(0,data.shape[0])
+        for i in range(0,data.shape[0]):
+            norm = np.mean(data[i,1:10])
+            growthminnorm = growthmin + norm
+            for ii in range(0,data.shape[1]-3):
+                if (data[i,ii]> growthminnorm) & (data[i,ii+1]> growthminnorm) & (data[i,ii+2]> growthminnorm):
+                    growth = True
+                    break
+                else:
+                    growth = False
+            test[i] = growth
+        return test
+    except IndexError:
+        norm = np.mean(data[1:10])
+        growthminnorm = growthmin + norm
+        for i in range(0,data.shape[0]-3):
+            if (data[i]> growthminnorm) & (data[i+1]> growthminnorm) & (data[i+2]> growthminnorm):
+                growth = True
+                break
+            else:
+                growth = False
+        test = growth
+        return test
+    except:
+        raise
+    
