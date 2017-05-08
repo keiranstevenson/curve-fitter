@@ -156,7 +156,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 repselection = repset == infile.iloc[:,replicols]
                 od = infile.loc[repselection]
                 # Defines names for results
-                labels = repset
+                labels = pd.DataFrame([repset])
                 repinfo1 = 'Fitting ' + repset
                 print(repinfo1)
                 
@@ -164,7 +164,8 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 # Converts columns to float format for fitderiv    
                 odfloat = np.array(od,dtype='float64')  
                 odfloat = alignreplicates(odfloat, normalise, alignvalue)
-                repinfo2 = 'Found ' + str(odfloat.shape[0]) + ' replicates'
+                noofreps = odfloat.shape[0]
+                repinfo2 = 'Found ' + str(noofreps) + ' replicates'
                 print(repinfo2)
                 
                 nantest = np.isnan(odfloat)
@@ -179,6 +180,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 print(location) 
                 od = infile.iloc[i]
                 od = od[labelcols+1:]
+                noofreps = 1
                 # Defines names for results                
                 labels = infile.iloc[i,0:labelcols]
                 labels = labels.copy()
@@ -249,7 +251,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                     plt.xlabel('Time [h]')
     
                     if replicates:
-                        picname = labels
+                        picname = repset
                     elif predefinedinput == 'BMG':
                         picname = labels.iloc[0] + str(labels.iloc[1])
                     elif len(labels) == 1:
@@ -273,6 +275,7 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
                 Lag = 0
                 note = ["No Growth"]
                 TimeofmaxGr = 0
+                noofreps = 0
                 
                 fitcurve = np.zeros(datalength)
                 fitcurveerr = np.zeros(datalength)
@@ -282,13 +285,13 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
             
             # Sticks into the output variable (allows individual debugging)
             if i == 1:
-                growthrates         = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr])],ignore_index = True)).transpose()
+                growthrates         = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr,noofreps])],ignore_index = True)).transpose()
                 growthcurves        = (pd.DataFrame(firstline)).transpose()
                 growthcurveserr     = (pd.DataFrame(firstline)).transpose()
                 growthcurvesder     = (pd.DataFrame(firstline)).transpose()
                 growthcurvesdererr  = (pd.DataFrame(firstline)).transpose()       
             else:    
-                growthratesin          = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr])],ignore_index = True)).transpose()
+                growthratesin          = (pd.concat([labels,pd.DataFrame([Gr,Err,Lag,TimeofmaxGr,noofreps])],ignore_index = True)).transpose()
                 growthrates         = pd.concat([growthrates,growthratesin],ignore_index = True)
     
             growthcurvesin          = (pd.concat([labels,pd.DataFrame(fitcurve)],ignore_index = True)).transpose()
@@ -308,7 +311,13 @@ def curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, label
     finally:
         # Always runs data saving in case of error
         if 'growthrates' in locals():
-            varnames = ['Row','Column','Note','GR','GR Err', 'Lag', 'Time of max GR']
+            if replicates:
+                varnames = ['Replicate Name','GR','GR Err', 'Lag', 'Time of max GR','no. of replicates']
+            else:
+                x = list(range(labels.shape[0]))
+                for labelindex in range(labels.shape[0]):
+                    x[labelindex] = 'Label'
+                varnames = x + ['GR','GR Err', 'Lag', 'Time of max GR','no. of replicates']
             growthrates.columns = varnames        
                 
             Outputname = os.path.join(filepath, filename + ' Analysed.xlsx')
@@ -408,14 +417,14 @@ def normalisetraces(indata, normvalue= 0.05, labelcols= 3, timerow= 1):
 
 
 def alignreplicates(dataset, normvalue= 0.05, alignvalue= 0.1):
-    alignpoint= normvalue+alignvalue
-    startindexes = np.int_(dataset[:,0])
-    
     diff = checkforgrowth(dataset,alignvalue)
     invdiff = [not x for x in diff]
     if np.any(invdiff):
         print('Error, replicate does not reach alignvalue, dropping from alignment')
         dataset = dataset[diff,:]
+    
+    alignpoint= normvalue+alignvalue
+    startindexes = np.int_(dataset[:,0])
         
     # Finds where data > alignpoint for 3 consecutive points
     for i in range(0,dataset.shape[0]):

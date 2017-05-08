@@ -15,7 +15,7 @@ filename = 'Datafiles/Shorttest.CSV'
 cfit(filename, labelcols = 3, replicols = 3, skiprows=6, waterwells=True, normalise = 0.1, noruns=1, nosamples=4)
 
 filename = 'Datafiles/Singlereplicate ex.csv'
-cfit(filename, predefinedinput= 'BMG', waterwells=True, normalise = 0.1, noruns=1, nosamples=4, showplots= False)
+cfit(filename, predefinedinput= 'BMG', waterwells=True, normalise = 0.1, noruns=1, nosamples=4, showplots= False, replicates= True)
 
 filename = 'Datafiles/Difformat/Tecanstyle.xlsx'
 cfit(filename, showplots=False, skiprows=63, labelcols=1, growthmin = 0.101, fitparams={0:[-5,8], 1:[-6,2], 2:[-5,2]})
