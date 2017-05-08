@@ -411,6 +411,12 @@ def alignreplicates(dataset, normvalue= 0.05, alignvalue= 0.1):
     alignpoint= normvalue+alignvalue
     startindexes = np.int_(dataset[:,0])
     
+    diff = checkforgrowth(dataset,alignvalue)
+    invdiff = [not x for x in diff]
+    if np.any(invdiff):
+        print('Error, replicate does not reach alignvalue, dropping from alignment')
+        dataset = dataset[diff,:]
+        
     # Finds where data > alignpoint for 3 consecutive points
     for i in range(0,dataset.shape[0]):
         for ii in range(0,dataset.shape[1]):
