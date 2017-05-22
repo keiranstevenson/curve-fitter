@@ -20,7 +20,7 @@ from fitderiv import fitderiv
 
 def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelcols=3, replicols=3,
                 waterwells=False, replicates=False, repignore=None, normalise=0.05, growthmin=0.05, alignvalue=0.1,
-                fitparams={0: [-5, 8], 1: [-6, -1], 2: [-5, 2]}, noruns=5, nosamples=20,
+                fitparams={0: [-5, 8], 1: [-6, -1], 2: [-5, 2]}, noruns=5, nosamples=20, logdata=True,
                 makeplots=True, showplots=False):
     '''
     filename: filename or folder location (only if replicates==1)
@@ -223,7 +223,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 for attemptno in range(5):
                     try:
                         fitty = fitderiv(t, np.transpose(odfloat), bd=fitparams, exitearly=False, nosamples=nosamples,
-                                         noruns=noruns)  # Peters program
+                                         noruns=noruns, logs=logdata)  # Peters program
                         break
                     except KeyboardInterrupt:
                         raise KeyboardInterrupt('User aborted run')
@@ -259,7 +259,10 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                     plt.subplot(2, 1, 1)
                     plt.plot(functime, fitty.d, 'r.')
                     plt.plot(functime, fitcurve, 'b')
-                    plt.ylabel('log OD')
+                    if logdata:
+                        plt.ylabel('log OD')
+                    else:
+                        plt.ylabel('OD')
                     plt.xlabel('Time [h]')
                     plt.subplot(2, 1, 2)
                     plt.plot(functime, fitdercurve, 'b')
@@ -343,13 +346,17 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 varnames = x + ['GR', 'GR Std Error', 'Lag', 'Time of max GR', 'no. of replicates']
             growthrates.columns = varnames
 
+            if logdata:
+                sheetnames = ['Stats','Fit (logn)', 'Fit Std Error (logn)','Derivative','Derivative std Error']
+            else:
+                sheetnames = ['Stats', 'Fit', 'Fit Std Error', 'Derivative', 'Derivative std Error']
             outputname = os.path.join(filepath, filename + ' Analysed.xlsx')
             writer = pd.ExcelWriter(outputname, engine='xlsxwriter')
-            growthrates.to_excel(writer, sheet_name='Stats')
-            growthcurves.to_excel(writer, sheet_name='Fit')
-            growthcurveserr.to_excel(writer, sheet_name='Fit Std Error')
-            growthcurvesder.to_excel(writer, sheet_name='Derivative')
-            growthcurvesdererr.to_excel(writer, sheet_name='Derivative Std Error')
+            growthrates.to_excel(writer, sheet_name=sheetnames[0])
+            growthcurves.to_excel(writer, sheet_name=sheetnames[1])
+            growthcurveserr.to_excel(writer, sheet_name=sheetnames[2])
+            growthcurvesder.to_excel(writer, sheet_name=sheetnames[3])
+            growthcurvesdererr.to_excel(writer, sheet_name=sheetnames[4])
             writer.save()
     return
 
@@ -449,6 +456,7 @@ def alignreplicates(dataset, normvalue=0.05, alignvalue=0.1):
 
     alignpoint = normvalue + alignvalue
     startindexes = np.int_(dataset[:, 0])
+
     # Finds where data > alignpoint for 3 consecutive points
     for i in range(0, dataset.shape[0]):
         for ii in range(0, dataset.shape[1]):
