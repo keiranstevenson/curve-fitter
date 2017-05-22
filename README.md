@@ -29,7 +29,7 @@ repignore| Regex formatted string that defines replicates to be ignored ie 'Samp
 normalise| Value that data is normalised to before fitting. Data is normalised such that the mean value of points 5-15 is equal to normalise. DO NOT USE 0(zero) or log function will fail|float| 0.05
 growthmin| Minimum value required for growth to be counted and fitted. Growth is determined as anywhere 3 consecutive points are geater than growthmin+minumum value for the curve. Fitting purely flat functions consumes time for fitting and produces unreliable results| float| 0.05
 alignvalue| Aligns replicates so that this value is reached at the same time for all reps. Alingment point is determined as i where i, i+1 and i+2 are greater than alignvalue+normalise. Where i is different for each replicate, the start of the data is removed until all i's are equal to the minimum i found.| float| 0.1
-fitparams| Fitparameters used by the Swain software| dictionary list of three value pairs|{0:[-5,8], 1:[-6,-1], 2:[-5,2]}
+fitparams| Fit parameters used by the Swain software| dictionary list of three value pairs|{0:[-5,8], 1:[-6,-1], 2:[-5,2]}
 noruns| Number of fitting attempts made by the software with the best attempt selected | integer| 5
 nosamples| Number of samples used to calculate error| integer| 20
 makeplots| Determines if program makes plots of data+fit and derivative, and saves to output folder. Plots made i | boolean| True
@@ -59,16 +59,20 @@ from curvefitter import curvefitter
 
 curvefitter('Example.xlsx', skiprows=1, labelcols=3, replicols=3, replicates=True)
 ```
-Row 4 and 5 will be fitted together as replicates, row 3 will be fitted on its own. Graphs will be displated with each fitting and saved to the output folder.
+Row 4 and 5 will be fitted together as replicates, row 3 will be fitted on its own. Graphs will be displayed with each fitting and saved to the output folder.
 ```
 Output structure:
 \datalocation\
             inputfile.xlsx
-             \inputfile outputdata\
+             \curvefitter outputdata\
                                     inputfile Analysed
-                                    \Plots\
-                                            Control.png
-                                            Cond1.png
+                                    inputfile 2 Analysed
+                                    \inputfile plots\
+                                                    Control.png
+                                                    Cond1.png
+                                    \inputfile 2 plots\
+                                                    Control.png
+                                                    Cond1.png  
 ```
 Further examples of program calls and files are present in the examplefileimport.py script and examples folder.
 # References
