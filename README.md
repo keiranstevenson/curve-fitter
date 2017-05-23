@@ -28,7 +28,7 @@ replicates| Indicates presence of replicates to be used for data sorting. This a
 repignore| Regex formatted string that defines replicates to be ignored ie 'Sample *' for BMG files|regex string| None
 normalise| Value that data is normalised to before fitting. Data is normalised such that the mean value of points 5-15 is equal to normalise. DO NOT USE 0(zero) or log function will fail|float| 0.05
 growthmin| Minimum value required for growth to be counted and fitted. Growth is determined as anywhere 3 consecutive points are greater than growthmin+minimum value for the curve. Fitting purely flat functions consumes time for fitting and produces unreliable results| float| 0.05
-alignvalue| Aligns replicates so that this value is reached at the same time for all reps. Alingment point is determined as i where i, i+1 and i+2 are greater than alignvalue+normalise. Where i is different for each replicate, the start of the data is removed until all i's are equal to the minimum i found.| float| 0.1
+alignvalue| Aligns replicates so that this value is reached at the same time for all reps, if alignvalue=None then it is skipped. Alingment point is determined as i where i, i+1 and i+2 are greater than alignvalue+normalise. Where i is ifferent for each replicate, the start of the data is removed until all i's are equal to the minimum i found.| float or None| 0.1
 fitparams| Fit parameters used by the Swain software. Narrower parameters, fine tuned to your data are recommended for faster fitting| dictionary list of three value pairs|{0:[-5,8], 1:[-6,-1], 2:[-5,2]}
 noruns| Number of fitting attempts made by the software with the best attempt selected | integer| 5
 nosamples| Number of samples used to calculate error| integer| 20

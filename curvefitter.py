@@ -51,7 +51,21 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
     # Process files before inputting
     filename = os.path.realpath(filename)
-    if replicates & os.path.isdir(filename) == True:
+    if os.path.isdir(filename):
+        files = glob(os.path.join(filename, '*.[cC][sS][vV]')) + glob(os.path.join(filename, '*.[xX][lL][sS][xX]'))
+        print('++++++++++Detected folder. Processing ' + str(len(files)) + ' files++++++++++')
+        for i in range(0, len(files)):
+            filename = files[i]
+            print('++++++++++ Processing file ++++++++++')
+            print(filename)
+            # Yay recursion
+            curvefitter(filename, header, predefinedinput, skiprows, labelcols, replicols,
+                        waterwells, replicates, repignore, normalise, growthmin, alignvalue,
+                        fitparams, noruns, nosamples, logdata,
+                        makeplots, showplots)
+        return
+
+    elif replicates & os.path.isdir(filename) == True:
         infile = multifilerepimport(filename, header, skiprows, labelcols, waterwells)
         filepath = os.path.join(filename, 'curvefitter' + ' outputdata')
         filename = os.path.split(filename)[-1]
@@ -92,19 +106,6 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         filename = filename.split('.')[-2]
         filepath = os.path.join(filepath, 'curvefitter' + ' outputdata')
 
-    elif os.path.isdir(filename):
-        files = glob(os.path.join(filename, '*.[cC][sS][vV]')) + glob(os.path.join(filename, '*.[xX][lL][sS][xX]'))
-        print('++++++++++Detected folder. Processing ' + str(len(files)) + ' files++++++++++')
-        for i in range(0, len(files)):
-            filename = files[i]
-            print('++++++++++ Processing file ++++++++++')
-            print(filename)
-            # Yay recursion
-            curvefitter(filename, header, predefinedinput, skiprows, labelcols, replicols,
-                        waterwells, replicates, repignore, normalise, growthmin, alignvalue,
-                        fitparams, noruns, nosamples, makeplots, showplots)
-        return
-
     elif os.path.isfile(filename):
         try:
             infile = pd.read_csv(filename, header=header, skiprows=skiprows)
@@ -122,6 +123,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         dataheight = infile.shape[0] - 1  # ignore time row
         datalength = infile.shape[1]
         firstline = infile.iloc[0]
+
     else:
         raise ImportError('File or directory not found')
 
@@ -145,11 +147,22 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
             '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \nTime does not always increase along its length \n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         print('Estimating missing values')
         timegradient = np.diff(time)
-        meanstep = np.mean(timegradient[0:10])
+        meanstep = np.mean(timegradient)
 
         for i in range(len(time) - 1):
             if abs(time[i] - time[i + 1]) > meanstep * 1.5:
                 time[i + 1] = time[i] + meanstep
+
+    # sanity check data
+    for i in range(1, infile.shape[0]):
+        data = np.float64(infile.iloc[i, labelcols:].copy())
+        datacheck = data[np.logical_not(np.isnan(data))]
+        if len(datacheck) > len(timecheck):
+            raise RuntimeError('Error data is longer than time')
+        data = normalisetraces(data, normvalue=normalise)
+        if any(data <= 0):
+            raise ArithmeticError(
+                'Error normalise value gives value <=0. Log function failed, please choose a larger value')
 
     try:
         for i in range(1, dataheight + 1):
@@ -347,7 +360,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
             growthrates.columns = varnames
 
             if logdata:
-                sheetnames = ['Stats','Fit (logn)', 'Fit Std Error (logn)','Derivative','Derivative std Error']
+                sheetnames = ['Stats', 'Fit (logn)', 'Fit Std Error (logn)', 'Derivative', 'Derivative std Error']
             else:
                 sheetnames = ['Stats', 'Fit', 'Fit Std Error', 'Derivative', 'Derivative std Error']
             outputname = os.path.join(filepath, filename + ' Analysed.xlsx')
@@ -448,35 +461,39 @@ def normalisetraces(dataset, normvalue=0.05):
 
 
 def alignreplicates(dataset, normvalue=0.05, alignvalue=0.1):
-    diff = checkforgrowth(dataset, alignvalue)
-    invdiff = np.logical_not(diff)
-    if np.any(invdiff):
-        print('Error, replicate does not reach alignvalue, dropping from alignment')
-        dataset = dataset[np.array(diff, bool), :]
+    if alignvalue is not None:
+        diff = checkforgrowth(dataset, alignvalue)
+        invdiff = np.logical_not(diff)
+        if np.any(invdiff):
+            print('Error, replicate does not reach alignvalue, dropping from alignment')
+            dataset = dataset[np.array(diff, bool), :]
 
-    alignpoint = normvalue + alignvalue
-    startindexes = np.int_(dataset[:, 0])
+        alignpoint = normvalue + alignvalue
+        startindexes = np.int_(dataset[:, 0])
 
-    # Finds where data > alignpoint for 3 consecutive points
-    for i in range(0, dataset.shape[0]):
-        for ii in range(0, dataset.shape[1]):
-            if (dataset[i, ii] > alignpoint) & (dataset[i, ii + 1] > alignpoint) & (dataset[i, ii + 2] > alignpoint):
-                x = ii
-                break
-        startindexes[i] = np.int_(x)
+        # Finds where data > alignpoint for 3 consecutive points
+        for i in range(0, dataset.shape[0]):
+            for ii in range(0, dataset.shape[1]):
+                if (dataset[i, ii] > alignpoint) & (dataset[i, ii + 1] > alignpoint) & (
+                            dataset[i, ii + 2] > alignpoint):
+                    x = ii
+                    break
+            startindexes[i] = np.int_(x)
 
-    # Aligns data into array by dropping cells in everything but lowest lag set
-    minindex = startindexes.min()
-    maxindex = startindexes.max()
-    maxrowlength = dataset.shape[1] - maxindex - 1
-    for i in range(0, dataset.shape[0]):
-        rowindex = startindexes[i]
-        newdata = dataset[i, rowindex - minindex:rowindex + maxrowlength - 1]
-        if i == 0:
-            stack = newdata
-        else:
-            stack = np.vstack((stack, newdata))
-    return stack
+        # Aligns data into array by dropping cells in everything but lowest lag set
+        minindex = startindexes.min()
+        maxindex = startindexes.max()
+        maxrowlength = dataset.shape[1] - maxindex - 1
+        for i in range(0, dataset.shape[0]):
+            rowindex = startindexes[i]
+            newdata = dataset[i, rowindex - minindex:rowindex + maxrowlength - 1]
+            if i == 0:
+                stack = newdata
+            else:
+                stack = np.vstack((stack, newdata))
+        return stack
+    else:
+        return dataset
 
 
 def checkforgrowth(data, growthmin):
@@ -486,7 +503,8 @@ def checkforgrowth(data, growthmin):
             norm = np.mean(data[i, 1:10])
             growthminnorm = growthmin + norm
             for ii in range(0, data.shape[1] - 3):
-                if (data[i, ii] > growthminnorm) & (data[i, ii + 1] > growthminnorm) & (data[i, ii + 2] > growthminnorm):
+                if (data[i, ii] > growthminnorm) & (data[i, ii + 1] > growthminnorm) & (
+                            data[i, ii + 2] > growthminnorm):
                     growth = True
                     break
                 else:
