@@ -18,25 +18,26 @@ curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, labelcols
 
 |Parameter|Definition|Type|Default|
 |---|---|---|---|
-|filename |Filename or folder location (only if replicates==1)|string| N/A
-|predefinedinput|'BMG' sets skiprows, labelcols, replicols and repignore based on standard format for BMG platereader files|string or None|None
-|skiprows|Lines of input file to skip before retrieving data. First row assumed as time with data following immediately below| Integer| 0
+filename |Filename or folder location (only if replicates==1)|string| N/A
+predefinedinput|'BMG' sets skiprows, labelcols, replicols and repignore based on standard format for BMG platereader files|string or None|None
+skiprows| Lines of input file to skip before retrieving data. First row assumed as time with data following immediately below| Integer| 0
 labelcols| First n columns of labels/text that are used to populate the output| integer| 3
 replicols| Column containing the values or strings used to match replicates. Rows with an exact match (including whitespace if string) in this column will be fitted together as replicates| integer| 3
 waterwells| Ignores wells on the outside of a 96 well plate. Columns 1 & 12, rows A & H.| boolean| False
-replicates| Indicates presense of replicates to be used for data sorting. This automatically runs normalise and align on replicates to ensure most accurate GR. | boolean| False
+replicates| Indicates presence of replicates to be used for data sorting. This automatically runs normalise and align on replicates to ensure most accurate GR. | boolean| False
 repignore| Regex formatted string that defines replicates to be ignored ie 'Sample *' for BMG files|regex string| None
 normalise| Value that data is normalised to before fitting. Data is normalised such that the mean value of points 5-15 is equal to normalise. DO NOT USE 0(zero) or log function will fail|float| 0.05
-growthmin| Minimum value required for growth to be counted and fitted. Growth is determined as anywhere 3 consecutive points are geater than growthmin+minumum value for the curve. Fitting purely flat functions consumes time for fitting and produces unreliable results| float| 0.05
-alignvalue| Aligns replicates so that this value is reached at the same time for all reps. Alingment point is determined as i where i, i+1 and i+2 are greater than alignvalue+normalise. Where i is different for each replicate, the start of the data is removed until all i's are equal to the minimum i found.| float| 0.1
-fitparams| Fitparameters used by the Swain software| dictionary list of three value pairs|{0:[-5,8], 1:[-6,-1], 2:[-5,2]}
+growthmin| Minimum value required for growth to be counted and fitted. Growth is determined as anywhere 3 consecutive points are greater than growthmin+minimum value for the curve. Fitting purely flat functions consumes time for fitting and produces unreliable results| float| 0.05
+alignvalue| Aligns replicates so that this value is reached at the same time for all reps, if alignvalue=None then it is skipped. Alingment point is determined as i where i, i+1 and i+2 are greater than alignvalue+normalise. Where i is ifferent for each replicate, the start of the data is removed until all i's are equal to the minimum i found.| float or None| 0.1
+fitparams| Fit parameters used by the Swain software. Narrower parameters, fine tuned to your data are recommended for faster fitting| dictionary list of three value pairs|{0:[-5,8], 1:[-6,-1], 2:[-5,2]}
 noruns| Number of fitting attempts made by the software with the best attempt selected | integer| 5
 nosamples| Number of samples used to calculate error| integer| 20
+logdata| If true then data is converted to natural log before fitting occurs, such as for fitting exponential growth rates| boolean| True
 makeplots| Determines if program makes plots of data+fit and derivative, and saves to output folder. Plots made i | boolean| True
 showplots| Displays plots during processing | boolean| True
 
 For details on the fitting routine itself please see the references at the bottom.
-While the initial parameters are designed for growth curves from a platereader, the fitting parameters can be tuned to fit a wide range of data sets. For the best fit it is reccomended that you ascertain the best fitparamter by running the fitderivgui.py file and follow the instructions in the GUI to fit at least one example of your data manually. Additional info on the nature of these parameters can be found at the webiste in the references below.
+While the initial parameters are designed for growth curves from a platereader, the fitting parameters can be tuned to fit a wide range of data sets. For the best fit it is reccomended that you ascertain the best fitparamter by running the fitderivgui.py file and follow the instructions in the GUI to fit at least one example of your data manually. Additional info on the nature of these parameters can be found at the website in the references below.
 The settings that you obtain can then be fed into the curve-fitter program to be used on the complete dataset.
 
 ### Input file format
@@ -59,16 +60,20 @@ from curvefitter import curvefitter
 
 curvefitter('Example.xlsx', skiprows=1, labelcols=3, replicols=3, replicates=True)
 ```
-Row 4 and 5 will be fitted together as replicates, row 3 will be fitted on its own. Graphs will be displated with each fitting and saved to the output folder.
+Row 4 and 5 will be fitted together as replicates, row 3 will be fitted on its own. Graphs will be displayed with each fitting and saved to the output folder.
 ```
 Output structure:
 \datalocation\
             inputfile.xlsx
-             \inputfile outputdata\
+             \curvefitter outputdata\
                                     inputfile Analysed
-                                    \Plots\
-                                            Control.png
-                                            Cond1.png
+                                    inputfile 2 Analysed
+                                    \inputfile plots\
+                                                    Control.png
+                                                    Cond1.png
+                                    \inputfile 2 plots\
+                                                    Control.png
+                                                    Cond1.png  
 ```
 Further examples of program calls and files are present in the examplefileimport.py script and examples folder.
 # References
