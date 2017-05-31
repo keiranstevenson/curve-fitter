@@ -46,6 +46,9 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         labelcols = 3
         replicols = 3
         repignore = 'Sample X*'
+    elif predefinedinput == 'Tecan':
+        skiprows = 63
+        labelcols = 1
 
     replicols = replicols - 1  # converts to index from number
 
@@ -396,7 +399,7 @@ def removewaterwells(indata, labelcols, deletewells=1):
 
 def cleannonreps(indata, replicol, repignore):
     # Removes wells matching a particular regex
-    if repignore == None:
+    if repignore is None:
         return indata
     if isinstance(repignore, str):
         cols = indata.iloc[:, replicol]
@@ -526,3 +529,5 @@ def checkforgrowth(data, growthmin):
         return test
     except:
         raise
+
+
