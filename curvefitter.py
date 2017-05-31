@@ -65,7 +65,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                         makeplots, showplots)
         return
 
-    elif replicates & os.path.isdir(filename) == True:
+    elif replicates & os.path.isdir(filename) is True:
         infile = multifilerepimport(filename, header, skiprows, labelcols, waterwells)
         filepath = os.path.join(filename, 'curvefitter' + ' outputdata')
         filename = os.path.split(filename)[-1]
@@ -77,7 +77,8 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         # Provide info about datashape for interation to use
         dataheight = uniquereps.shape[0]
         datalength = infile.shape[1]
-        firstline = infile.iloc[0]
+        firstline = infile.iloc[0, labelcols - 1:].copy()
+        firstline = firstline.reset_index(drop=True)
 
         print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
         for x in uniquereps: print(x)
@@ -95,7 +96,8 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
         dataheight = uniquereps.shape[0]
         datalength = infile.shape[1]
-        firstline = infile.iloc[0]
+        firstline = infile.iloc[0, labelcols - 1:].copy()
+        firstline = firstline.reset_index(drop=True)
 
         print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
         for x in uniquereps: print(x)
@@ -249,7 +251,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                             raise MemoryError('Out of memory while fitting. Try using fewer replicates')
                         else:
                             raise MemoryError(
-                                'Out of memory while fitting. Unable to determine version, try making more memory available or using fewer replicates')
+                                'Out of memory while fitting. Unable to determine python version, try making more memory available or using fewer replicates')
 
                     except:
                         print('Fitting failure, retrying')
