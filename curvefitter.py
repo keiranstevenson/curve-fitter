@@ -145,8 +145,9 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     time = np.float64(time)
 
     # sanity check time
-    timecheck = np.gradient(time)
-    timecheck = timecheck[np.logical_not(np.isnan(timecheck))]
+    timecheck = time[np.logical_not(np.isnan(time))]
+    timecheck = np.gradient(timecheck)
+
     if any(timecheck < 0):
         print(
             '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \nTime does not always increase along its length \n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
@@ -161,8 +162,8 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     # sanity check data
     for i in range(1, infile.shape[0]):
         data = np.float64(infile.iloc[i, labelcols:].copy())
-        datacheck = data[np.logical_not(np.isnan(data))]
-        if len(datacheck) > len(timecheck):
+        data = data[np.logical_not(np.isnan(data))]
+        if len(data) > len(timecheck):
             raise RuntimeError('Error data is longer than time')
         data = normalisetraces(data, normvalue=normalise)
         if any(data <= 0):
