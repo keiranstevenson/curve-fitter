@@ -18,19 +18,19 @@ import pandas as pd
 from fitderiv import fitderiv
 
 
-def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelcols=3, replicols=3,
-                waterwells=False, replicates=False, repignore=None, normalise=0.05, growthmin=0.05, alignvalue=0.1,
+def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelcolumns=3, replicatecolumn=3,
+                replicates=False, replicateignore=None, normalise=0.05, growthmin=0.05, alignvalue=0.1,
                 fitparams={0: [-5, 8], 1: [-6, -1], 2: [-5, 2]}, noruns=5, nosamples=20, logdata=True,
                 makeplots=True, showplots=False):
     '''
     filename: filename or folder location (only if replicates==1)
-    predefinedinput: 'BMG' sets skiprows, labelcols, replicols and repignore based on standard format for BMG platereader files
+    predefinedinput: 'BMG' sets skiprows, labelcolumns, replicatecolumn and replicateignore based on standard format for BMG platereader files
     skiprows; lines of input file to skip before retrieving data. First row assumed as time with data following immediately below
-    labelcols; first n columns are labels/text and are used to populate the output
-    replicols; column containing the strings used to match replicates
+    labelcolumns; first n columns are labels/text and are used to populate the output
+    replicatecolumn; column containing the strings used to match replicates
     waterwells; ignores wells on the outside of 96 well plate
     replicates; indicates presense of replicates to be used for data sorting automatically runs normalise and align on replicates to ensure most accurate GR
-    repignore; regex string that defines replicates to be ignored ie 'Sample *' for BMG files
+    replicateignore; regex string that defines replicates to be ignored ie 'Sample *' for BMG files
     normalise; value that data is normalised to at the start DO NOT USE 0 or log function will fail
     growthmin; minimum value required for growth to be counted and fitted, fitting purely flat functions consumes time for fitting and produces unreliable results
     alignvalue; aligns replicates so that this value is reached at the same time for all reps
@@ -43,14 +43,15 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
     if predefinedinput == 'BMG':  # For BMG output from TP lab reader
         skiprows = 6
-        labelcols = 3
-        replicols = 3
-        repignore = 'Sample X*'
+        labelcolumns = 3
+        replicatecolumn = 3
+        replicateignore = 'Sample X*'
     elif predefinedinput == 'Tecan':
         skiprows = 63
-        labelcols = 1
+        labelcolumns = 1
 
-    replicols = replicols - 1  # converts to index from number
+    waterwells = False  # no longer necessary but left
+    replicatecolumn = replicatecolumn - 1  # converts to index from number
 
     # Process files before inputting
     filename = os.path.realpath(filename)
@@ -62,25 +63,25 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
             print('++++++++++ Processing file ++++++++++')
             print(filename)
             # Yay recursion
-            curvefitter(filename, header, predefinedinput, skiprows, labelcols, replicols,
-                        waterwells, replicates, repignore, normalise, growthmin, alignvalue,
+            curvefitter(filename, header, predefinedinput, skiprows, labelcolumns, replicatecolumn,
+                        waterwells, replicates, replicateignore, normalise, growthmin, alignvalue,
                         fitparams, noruns, nosamples, logdata,
                         makeplots, showplots)
         return
 
     elif replicates & os.path.isdir(filename) is True:
-        infile = multifilerepimport(filename, header, skiprows, labelcols, waterwells)
+        infile = multifilerepimport(filename, header, skiprows, labelcolumns, waterwells)
         filepath = os.path.join(filename, 'curvefitter' + ' outputdata')
         filename = os.path.split(filename)[-1]
-        infile = cleannonreps(infile, replicols, repignore)
+        infile = cleannonreps(infile, replicatecolumn, replicateignore)
 
-        reps = infile.iloc[1:, replicols]
+        reps = infile.iloc[1:, replicatecolumn]
         uniquereps = np.unique(reps)
 
         # Provide info about datashape for interation to use
         dataheight = uniquereps.shape[0]
         datalength = infile.shape[1]
-        firstline = infile.iloc[0, labelcols - 1:].copy()
+        firstline = infile.iloc[0, labelcolumns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
 
         print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
@@ -93,13 +94,13 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         except pd.parser.CParserError:
             infile = pd.read_excel(filename, header=header, skiprows=skiprows)
 
-        infile = cleannonreps(infile, replicols, repignore)
-        reps = infile.iloc[1:, replicols]
+        infile = cleannonreps(infile, replicatecolumn, replicateignore)
+        reps = infile.iloc[1:, replicatecolumn]
         uniquereps = np.unique(reps)
 
         dataheight = uniquereps.shape[0]
         datalength = infile.shape[1]
-        firstline = infile.iloc[0, labelcols - 1:].copy()
+        firstline = infile.iloc[0, labelcolumns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
 
         print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
@@ -122,7 +123,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         filename = filename.split('.')[-2]
         filepath = os.path.join(filepath, 'curvefitter' + ' outputdata')
         if waterwells:
-            infile = removewaterwells(infile, labelcols)
+            infile = removewaterwells(infile, labelcolumns)
 
         # Gather info about raw numerical data
         dataheight = infile.shape[0] - 1  # ignore time row
@@ -141,7 +142,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
     # Separate time variable
     time = infile.iloc[0]
-    time = time.iloc[labelcols:]
+    time = time.iloc[labelcolumns:]
     time = np.float64(time)
 
     # sanity check time
@@ -161,7 +162,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
     # sanity check data
     for i in range(1, infile.shape[0]):
-        data = np.float64(infile.iloc[i, labelcols:].copy())
+        data = np.float64(infile.iloc[i, labelcolumns:].copy())
         data = data[np.logical_not(np.isnan(data))]
         if len(data) > len(timecheck):
             raise RuntimeError('Error data is longer than time')
@@ -176,14 +177,14 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 location = '++++++++++ Processing replicate set ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
                 print(location)
                 repset = uniquereps[i - 1]
-                repselection = repset == infile.iloc[:, replicols]
+                repselection = repset == infile.iloc[:, replicatecolumn]
                 od = infile.loc[repselection]
 
                 # Defines names for results
                 labels = pd.DataFrame([repset])
                 repinfo1 = 'Fitting ' + repset
                 print(repinfo1)
-                od = (od.iloc[:, labelcols:]).copy()
+                od = (od.iloc[:, labelcolumns:]).copy()
 
                 # Converts columns to float format for fitderiv
                 odfloat = np.array(od, dtype='float64')
@@ -205,11 +206,11 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
                 print(location)
                 od = infile.iloc[i]
-                od = od[labelcols + 1:]
+                od = od[labelcolumns + 1:]
                 noofreps = 1
 
                 # Defines names for results
-                labels = infile.iloc[i, 0:labelcols]
+                labels = infile.iloc[i, 0:labelcolumns]
                 labels = labels.copy()
 
                 # Converts columns to float format for fitderiv
@@ -227,7 +228,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
             sys.stdout.flush()  # Forces prints to display immediately
 
             # Check for growth
-            growthfound = checkforgrowth(odfloat, growthmin)
+            growthfound = checkforgrowth(odfloat, growthmin, normalise)
             # Checks for growth in each replicate individually
             if (type(growthfound) == np.ndarray) | (type(growthfound) == list):
                 invdiff = np.logical_not(growthfound)
@@ -468,7 +469,7 @@ def normalisetraces(dataset, normvalue=0.05):
 
 def alignreplicates(dataset, normvalue=0.05, alignvalue=0.1):
     if alignvalue is not None:
-        diff = checkforgrowth(dataset, alignvalue)
+        diff = checkforgrowth(dataset, alignvalue, normvalue)
         invdiff = np.logical_not(diff)
         if np.any(invdiff):
             print('Error, replicate does not reach alignvalue, dropping from alignment')
@@ -502,12 +503,11 @@ def alignreplicates(dataset, normvalue=0.05, alignvalue=0.1):
         return dataset
 
 
-def checkforgrowth(data, growthmin):
+def checkforgrowth(data, growthmin, normalise):
     try:
         test = np.array(range(0, data.shape[0]))
         for i in range(0, data.shape[0]):
-            norm = np.mean(data[i, 1:10])
-            growthminnorm = growthmin + norm
+            growthminnorm = growthmin + normalise
             for ii in range(0, data.shape[1] - 3):
                 if (data[i, ii] > growthminnorm) & (data[i, ii + 1] > growthminnorm) & (
                             data[i, ii + 2] > growthminnorm):
@@ -518,8 +518,7 @@ def checkforgrowth(data, growthmin):
             test[i] = growth
         return test
     except IndexError:
-        norm = np.mean(data[1:10])
-        growthminnorm = growthmin + norm
+        growthminnorm = growthmin + normalise
         for i in range(0, data.shape[0] - 3):
             if (data[i] > growthminnorm) & (data[i + 1] > growthminnorm) & (data[i + 2] > growthminnorm):
                 growth = True
