@@ -55,21 +55,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
     # Process files before inputting
     filename = os.path.realpath(filename)
-    if os.path.isdir(filename):
-        files = glob(os.path.join(filename, '*.[cC][sS][vV]')) + glob(os.path.join(filename, '*.[xX][lL][sS][xX]'))
-        print('++++++++++Detected folder. Processing ' + str(len(files)) + ' files++++++++++')
-        for i in range(0, len(files)):
-            filename = files[i]
-            print('++++++++++ Processing file ++++++++++')
-            print(filename)
-            # Yay recursion
-            curvefitter(filename, header, predefinedinput, skiprows, labelcolumns, replicatecolumn,
-                        waterwells, replicatesexist, replicateignore, normalise, growthmin, alignvalue,
-                        fitparams, noruns, nosamples, logdata,
-                        makeplots, showplots)
-        return
-
-    elif replicatesexist & os.path.isdir(filename) is True:
+    if replicatesexist & os.path.isdir(filename) is True:
         infile = multifilerepimport(filename, header, skiprows, labelcolumns, waterwells)
         filepath = os.path.join(filename, 'curvefitter' + ' outputdata')
         filename = os.path.split(filename)[-1]
@@ -84,9 +70,24 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         firstline = infile.iloc[0, labelcolumns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
 
-        print('++++++++++ Found ' + str(dataheight) + ' replicatesexist ++++++++++')
+        print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
         for x in uniquereps: print(x)
         sys.stdout.flush()
+
+    elif os.path.isdir(filename):
+        files = glob(os.path.join(filename, '*.[cC][sS][vV]')) + glob(os.path.join(filename, '*.[xX][lL][sS][xX]'))
+        print('++++++++++Detected folder. Processing ' + str(len(files)) + ' files++++++++++')
+        for i in range(0, len(files)):
+            filename = files[i]
+            print('++++++++++ Processing file ++++++++++')
+            print(filename)
+            # Yay recursion
+            curvefitter(filename=filename, header=header, predefinedinput=predefinedinput, skiprows=skiprows,
+                        labelcolumns=labelcolumns, replicatecolumn=replicatecolumn + 1, replicatesexist=replicatesexist,
+                        replicateignore=replicateignore, normalise=normalise, growthmin=growthmin,
+                        alignvalue=alignvalue, fitparams=fitparams, noruns=noruns, nosamples=nosamples, logdata=logdata,
+                        makeplots=makeplots, showplots=showplots)
+        return
 
     elif replicatesexist & os.path.isfile(filename):
         try:
@@ -103,7 +104,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         firstline = infile.iloc[0, labelcolumns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
 
-        print('++++++++++ Found ' + str(dataheight) + ' replicatesexist ++++++++++')
+        print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
         for x in uniquereps: print(x)
         sys.stdout.flush()
 
@@ -417,31 +418,53 @@ def cleannonreps(indata, replicol, repignore):
 
 
 def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
-    files = glob(os.path.join(filedirectory, '*.[cC][sS][vV]')) + glob(
-        os.path.join(filedirectory, '*.[xX][lL][sS][xX]'))
-    print('++++++++++ Found ' + str(len(files)) + ' files ++++++++++')
-
-    # First need to determine max time length to use as first input
-    for i in range(0, (len(files))):
-        if i == 0:
-            testfile = pd.read_csv(files[i], header=header, skiprows=skiprows)
-            time = testfile.iloc[0, :]
-            time = pd.DataFrame(time)
-        else:
-            testfile = pd.read_csv(files[i], header=header, skiprows=skiprows)
-            if testfile.shape[1] > len(time):
+    files = glob(os.path.join(filedirectory, '*.[cC][sS][vV]'))
+    if len(files) is not 0:
+        print('++++++++++ Found ' + str(len(files)) + ' files ++++++++++')
+        # First need to determine max time length to use as first input
+        for i in range(0, (len(files))):
+            if i == 0:
+                testfile = pd.read_csv(files[i], header=header, skiprows=skiprows)
                 time = testfile.iloc[0, :]
                 time = pd.DataFrame(time)
+            else:
+                testfile = pd.read_csv(files[i], header=header, skiprows=skiprows)
+                if testfile.shape[1] > len(time):
+                    time = testfile.iloc[0, :]
+                    time = pd.DataFrame(time)
 
-    stackfile = time.transpose()
+        stackfile = time.transpose()
 
-    for i in range(0, len(files)):
-        newfile = pd.read_csv(files[i], header=header, skiprows=skiprows + 1)
-        stackfile = stackfile.append(newfile, ignore_index=True)
+        for i in range(0, len(files)):
+            newfile = pd.read_csv(files[i], header=header, skiprows=skiprows + 1)
+            stackfile = stackfile.append(newfile, ignore_index=True)
 
-    if waterwells:
-        removewaterwells(stackfile, labelcols)
-    return stackfile
+        if waterwells:
+            removewaterwells(stackfile, labelcols)
+        return stackfile
+    else:
+        files = glob(os.path.join(filedirectory, '*.[xX][lL][sS][xX]'))
+        print('++++++++++ Found ' + str(len(files)) + ' files ++++++++++')
+        for i in range(0, (len(files))):
+            if i == 0:
+                testfile = pd.read_excel(files[i], header=header, skiprows=skiprows)
+                time = testfile.iloc[0, :]
+                time = pd.DataFrame(time)
+            else:
+                testfile = pd.read_excel(files[i], header=header, skiprows=skiprows)
+                if testfile.shape[1] > len(time):
+                    time = testfile.iloc[0, :]
+                    time = pd.DataFrame(time)
+
+        stackfile = time.transpose()
+
+        for i in range(0, len(files)):
+            newfile = pd.read_excel(files[i], header=header, skiprows=skiprows + 1)
+            stackfile = stackfile.append(newfile, ignore_index=True)
+
+        if waterwells:
+            removewaterwells(stackfile, labelcols)
+        return stackfile
 
 
 def normalisetraces(dataset, normvalue=0.05):
