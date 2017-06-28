@@ -191,7 +191,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 odfloat = normalisetraces(odfloat, normalise)
                 odfloat = alignreplicates(odfloat, normalise, alignvalue)
                 noofreps = odfloat.shape[0]
-                repinfo2 = 'Found ' + str(noofreps) + ' replicatesexist'
+                repinfo2 = 'Found ' + str(noofreps) + ' replicates'
                 print(repinfo2)
 
                 # Removes NaNs from analysis
@@ -202,6 +202,10 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                         break
                 odfloat = odfloat[:, :ii]
                 t = time[:ii]
+                if noofreps == 0:
+                    growthfound = False
+                else:
+                    growthfound = True
             else:
                 location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
                 print(location)
@@ -225,18 +229,10 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                         break
                 odfloat = odfloat[:ii]
                 t = time[:ii]
-            sys.stdout.flush()  # Forces prints to display immediately
 
-            # Check for growth
-            growthfound = checkforgrowth(odfloat, growthmin, normalise)
-            # Checks for growth in each replicate individually
-            if (type(growthfound) == np.ndarray) | (type(growthfound) == list):
-                invdiff = np.logical_not(growthfound)
-                # Drops replicatesexist that show no growth
-                if np.any(invdiff) & replicatesexist:
-                    print('Error, no growth detected in replicate, dropping from analysis')
-                    odfloat = odfloat[np.array(growthfound, bool), :]
-                growthfound = True
+                # Check for growth
+                growthfound = checkforgrowth(odfloat, growthmin, normalise)
+            sys.stdout.flush()  # Forces prints to display immediately
 
             if growthfound:
                 # Runs fitderiv only if growth is over growthmin
@@ -358,12 +354,12 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         # Always runs data saving in case of error
         if 'growthrates' in locals():  # Checks that there is data to save
             if replicatesexist:
-                varnames = ['Replicate Name', 'GR', 'GR Std Error', 'Lag', 'Time of max GR', 'no. of replicatesexist']
+                varnames = ['Replicate Name', 'GR', 'GR Std Error', 'Lag', 'Time of max GR', 'no. of replicates']
             else:
                 x = list(range(labels.shape[0]))
                 for labelindex in range(labels.shape[0]):
                     x[labelindex] = 'Label'
-                varnames = x + ['GR', 'GR Std Error', 'Lag', 'Time of max GR', 'no. of replicatesexist']
+                varnames = x + ['GR', 'GR Std Error', 'Lag', 'Time of max GR', 'no. of replicates']
             growthrates.columns = varnames
 
             if logdata:
@@ -474,6 +470,10 @@ def alignreplicates(dataset, normvalue=0.05, alignvalue=0.1):
         if np.any(invdiff):
             print('Error, replicate does not reach alignvalue, dropping from alignment')
             dataset = dataset[np.array(diff, bool), :]
+        try:
+            dataset[1]
+        except:
+            return dataset
 
         alignpoint = normvalue + alignvalue
         startindexes = np.int_(dataset[:, 0])
