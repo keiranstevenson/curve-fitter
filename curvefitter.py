@@ -19,21 +19,21 @@ from fitderiv import fitderiv
 
 
 def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelcolumns=3, replicatecolumn=3,
-                replicates=False, replicateignore=None, normalise=0.05, growthmin=0.05, alignvalue=0.1,
+                replicatesexist=False, replicateignore=None, normalise=0.05, growthmin=0.05, alignvalue=0.1,
                 fitparams={0: [-5, 8], 1: [-6, -1], 2: [-5, 2]}, noruns=5, nosamples=20, logdata=True,
                 makeplots=True, showplots=False):
     '''
-    filename: filename or folder location (only if replicates==1)
+    filename: filename or folder location (only if replicatesexist==1)
     predefinedinput: 'BMG' sets skiprows, labelcolumns, replicatecolumn and replicateignore based on standard format for BMG platereader files
     skiprows; lines of input file to skip before retrieving data. First row assumed as time with data following immediately below
     labelcolumns; first n columns are labels/text and are used to populate the output
-    replicatecolumn; column containing the strings used to match replicates
+    replicatecolumn; column containing the strings used to match replicatesexist
     waterwells; ignores wells on the outside of 96 well plate
-    replicates; indicates presense of replicates to be used for data sorting automatically runs normalise and align on replicates to ensure most accurate GR
-    replicateignore; regex string that defines replicates to be ignored ie 'Sample *' for BMG files
+    replicatesexist; indicates presense of replicatesexist to be used for data sorting automatically runs normalise and align on replicatesexist to ensure most accurate GR
+    replicateignore; regex string that defines replicatesexist to be ignored ie 'Sample *' for BMG files
     normalise; value that data is normalised to at the start DO NOT USE 0 or log function will fail
     growthmin; minimum value required for growth to be counted and fitted, fitting purely flat functions consumes time for fitting and produces unreliable results
-    alignvalue; aligns replicates so that this value is reached at the same time for all reps
+    alignvalue; aligns replicatesexist so that this value is reached at the same time for all reps
     fitparams; fitparameters used by the deODoriser
     noruns; number of fitting attempts made
     nosamples; number of samples used to calculate error
@@ -64,12 +64,12 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
             print(filename)
             # Yay recursion
             curvefitter(filename, header, predefinedinput, skiprows, labelcolumns, replicatecolumn,
-                        waterwells, replicates, replicateignore, normalise, growthmin, alignvalue,
+                        waterwells, replicatesexist, replicateignore, normalise, growthmin, alignvalue,
                         fitparams, noruns, nosamples, logdata,
                         makeplots, showplots)
         return
 
-    elif replicates & os.path.isdir(filename) is True:
+    elif replicatesexist & os.path.isdir(filename) is True:
         infile = multifilerepimport(filename, header, skiprows, labelcolumns, waterwells)
         filepath = os.path.join(filename, 'curvefitter' + ' outputdata')
         filename = os.path.split(filename)[-1]
@@ -84,11 +84,11 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         firstline = infile.iloc[0, labelcolumns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
 
-        print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
+        print('++++++++++ Found ' + str(dataheight) + ' replicatesexist ++++++++++')
         for x in uniquereps: print(x)
         sys.stdout.flush()
 
-    elif replicates & os.path.isfile(filename):
+    elif replicatesexist & os.path.isfile(filename):
         try:
             infile = pd.read_csv(filename, header=header, skiprows=skiprows)
         except pd.parser.CParserError:
@@ -103,7 +103,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         firstline = infile.iloc[0, labelcolumns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
 
-        print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
+        print('++++++++++ Found ' + str(dataheight) + ' replicatesexist ++++++++++')
         for x in uniquereps: print(x)
         sys.stdout.flush()
 
@@ -173,7 +173,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
     try:
         for i in range(1, dataheight + 1):
-            if replicates:
+            if replicatesexist:
                 location = '++++++++++ Processing replicate set ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
                 print(location)
                 repset = uniquereps[i - 1]
@@ -191,7 +191,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 odfloat = normalisetraces(odfloat, normalise)
                 odfloat = alignreplicates(odfloat, normalise, alignvalue)
                 noofreps = odfloat.shape[0]
-                repinfo2 = 'Found ' + str(noofreps) + ' replicates'
+                repinfo2 = 'Found ' + str(noofreps) + ' replicatesexist'
                 print(repinfo2)
 
                 # Removes NaNs from analysis
@@ -232,8 +232,8 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
             # Checks for growth in each replicate individually
             if (type(growthfound) == np.ndarray) | (type(growthfound) == list):
                 invdiff = np.logical_not(growthfound)
-                # Drops replicates that show no growth
-                if np.any(invdiff) & replicates:
+                # Drops replicatesexist that show no growth
+                if np.any(invdiff) & replicatesexist:
                     print('Error, no growth detected in replicate, dropping from analysis')
                     odfloat = odfloat[np.array(growthfound, bool), :]
                 growthfound = True
@@ -251,12 +251,12 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                         version = platform.architecture()[0]
                         if version == '32bit':
                             raise MemoryError(
-                                'Out of Memory while fitting. Try installing 64-bit python or using fewer replicates')
+                                'Out of Memory while fitting. Try installing 64-bit python or using fewer replicatesexist')
                         elif version == '64bit':
-                            raise MemoryError('Out of memory while fitting. Try using fewer replicates')
+                            raise MemoryError('Out of memory while fitting. Try using fewer replicatesexist')
                         else:
                             raise MemoryError(
-                                'Out of memory while fitting. Unable to determine python version, try making more memory available or using fewer replicates')
+                                'Out of memory while fitting. Unable to determine python version, try making more memory available or using fewer replicatesexist')
 
                     except:
                         print('Fitting failure, retrying')
@@ -291,7 +291,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                     plt.ylabel('GR [Hr$^{-1}$]')
                     plt.xlabel('Time [h]')
 
-                    if replicates:
+                    if replicatesexist:
                         picname = repset
                     elif predefinedinput == 'BMG':
                         picname = labels.iloc[0] + str(labels.iloc[1])
@@ -357,13 +357,13 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     finally:
         # Always runs data saving in case of error
         if 'growthrates' in locals():  # Checks that there is data to save
-            if replicates:
-                varnames = ['Replicate Name', 'GR', 'GR Std Error', 'Lag', 'Time of max GR', 'no. of replicates']
+            if replicatesexist:
+                varnames = ['Replicate Name', 'GR', 'GR Std Error', 'Lag', 'Time of max GR', 'no. of replicatesexist']
             else:
                 x = list(range(labels.shape[0]))
                 for labelindex in range(labels.shape[0]):
                     x[labelindex] = 'Label'
-                varnames = x + ['GR', 'GR Std Error', 'Lag', 'Time of max GR', 'no. of replicates']
+                varnames = x + ['GR', 'GR Std Error', 'Lag', 'Time of max GR', 'no. of replicatesexist']
             growthrates.columns = varnames
 
             if logdata:

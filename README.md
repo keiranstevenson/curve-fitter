@@ -14,7 +14,7 @@ Scipy
 # How to use curve-fitter
 curvefitter(filename)
 curvefitter(predefinedinput= 'BMG')
-curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, labelcolumns= 3, replicatecolumn= 3, replicates= False, replicateignore= None, normalise= 0.05, growthmin= 0.05, alignvalue= 0.1, fitparams= {0:[-5,8], 1:[-6,-1], 2:[-5,2]}, noruns= 5, nosamples= 20, makeplots = True, showplots= True):
+curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, labelcolumns= 3, replicatecolumn= 3, replicatesexist= False, replicateignore= None, normalise= 0.05, growthmin= 0.05, alignvalue= 0.1, fitparams= {0:[-5,8], 1:[-6,-1], 2:[-5,2]}, noruns= 5, nosamples= 20, makeplots = True, showplots= True):
 
 ### Parameters
 
@@ -24,7 +24,7 @@ filename |Filename or folder location. If a folder is given and replicates is Tr
 predefinedinput|'BMG' sets skiprows, labelcols, replicols and repignore based on standard format for BMG platereader files|string or None|None
 skiprows| Lines of input file to skip before retrieving data. First row assumed as time with data following immediately below| Integer| 0
 labelcolumns| The number of columns at the start of the table that are not data.| integer| 3
-replicates| Indicates presence of replicates to be used for data sorting. This runs alignment on replicates to ensure most accurate GR. | boolean| False
+replicatesexist| Indicates presence of replicates to be used for data sorting. This runs alignment on replicates to ensure most accurate GR. | boolean| False
 replicateignore| If true, rows with replicatecolumn = ignore will be skipped by analysis. This allows for ignoring wells that show growth but are not required| boolean| True
 replicatecolumn| Column containing the strings used to match replicates. Rows with an exact match (including whitespace if string) in this column will be fitted together as replicates| integer| 3
 normalise| Value that data is normalised to before fitting. Data is normalised such that the mean value of points 5-15 is equal to normalise. DO NOT USE 0(zero) or log function will fail|float| 0.05

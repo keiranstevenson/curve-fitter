@@ -18,11 +18,11 @@ from curvefitter import curvefitter as cfit
 #cfit(filename, predefinedinput='BMG', waterwells=True, normalise=0.1, noruns=1, nosamples=4, showplots=False,
 #     replicates=True)
 
-#filename = 'Datafiles/Difformat/Tecanstyle.xlsx'
-#cfit(filename, showplots=False, skiprows=63, labelcols=1, growthmin=0.101, normalise=0.2,
-#     fitparams={0: [-3, 8], 1: [-6, 2], 2: [-5, 2]})
+filename = 'Datafiles/Difformat/Tecanstyle.xlsx'
+cfit(filename, showplots=False, skiprows=63, labelcolumns=1, growthmin=0.101, normalise=0.2,
+     fitparams={0: [-3, 8], 1: [-6, 2], 2: [-5, 2]})
 
 filename = 'Datafiles/'
-cfit(filename, predefinedinput='BMG', waterwells=True, showplots=False)
+cfit(filename, predefinedinput='BMG', showplots=False)
 
 print('YAY! No errors!')
