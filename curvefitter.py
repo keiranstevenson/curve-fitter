@@ -168,10 +168,11 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         data = data[np.logical_not(np.isnan(data))]
         if len(data) > len(timecheck):
             raise RuntimeError('Error data is longer than time')
-        data = normalisetraces(data, normvalue=normalise, startnormalise=startnormalise)
-        if any(data <= 0):
-            raise ArithmeticError(
-                'Error normalise value gives value <=0. Log function failed, please choose a larger value')
+        if len(data) > 0:
+            data = normalisetraces(data, normvalue=normalise, startnormalise=startnormalise)
+            if any(data <= 0):
+                raise ArithmeticError(
+                    'Error normalise value gives value <=0. Log function failed, please choose a larger value')
 
     try:
         for i in range(1, dataheight + 1):
@@ -468,32 +469,35 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
         return stackfile
 
 
-def normalisetraces(dataset, normvalue=0.05, startpoint=2):
+def normalisetraces(dataset, normvalue=0.05, startnormalise=2):
+    startpoint = startnormalise
     # Normalises line by line on points 5:15
     try:
         x = dataset.shape[1]
         for i in range(0, dataset.shape[0]):
             stdev = np.std(dataset[i, startpoint:startpoint + 5])
-            limit = stdev * 2
+            limit = stdev * 2 + np.mean(dataset[i,startpoint:startpoint + 5])
             for ii in range(startpoint + 3, dataset.shape[1]):
-                newstdev = np.std(dataset[i, startpoint:ii])
-                if newstdev > limit:
+                newpoint = dataset[i, ii]
+                if newpoint > limit:
                     break
-            zeroingvalue = np.mean(dataset[i, startpoint:ii-1])
+            # zeroingvalue = np.mean(dataset[i, startpoint:ii-1])
             # zeroingvalue = np.mean(dataset[i, 4:14])
+            zeroingvalue = np.min(dataset[i, startpoint:ii - 1])
             zeroingvalue = normvalue - zeroingvalue
             dataset[i, :] = dataset[i, :] + zeroingvalue
 
         return dataset
     except IndexError:
         stdev = np.std(dataset[startpoint:startpoint + 5])
-        limit = stdev * 2
+        limit = stdev * 2 + np.mean(dataset[startpoint:startpoint + 5])
         for ii in range(startpoint + 3, dataset.shape[0]):
-            newstdev = np.std(dataset[startpoint:ii])
-            if newstdev > limit:
+            newpoint = dataset[ii]
+            if newpoint > limit:
                 break
-        zeroingvalue = np.mean(dataset[startpoint:ii-1])
+        # zeroingvalue = np.mean(dataset[startpoint:ii-1])
         # zeroingvalue = np.mean(dataset[i, 4:14])
+        zeroingvalue = np.min(dataset[startpoint:ii - 1])
         zeroingvalue = normvalue - zeroingvalue
         dataset = dataset + zeroingvalue
         return dataset

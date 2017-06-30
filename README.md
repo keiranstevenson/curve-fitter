@@ -88,11 +88,11 @@ Alignment point is determined at an index i where the values at i, i+1 and i+2 a
 ### Normalising procedure
 The variable of startnormalise is made editable as the minimal regions may not be at the start of a given dataset. The normalising routine looks for the largest region following this start index where no change is seen (variation below two standard deviations)
 1. A single row is taken from the full dataset
-2. The standard deviation of the range startnormalise:startnormalise+5 is calculated. This is then multiplied by two and set as the limit for step 4
+2. The standard deviation of the range startnormalise:startnormalise+5 is calculated. This is then added to the mean of this range, and used as the limit for 4
 3. The range is expanded incrementally and standard deviation recalculated.
 4. If this new standard deviation is greater than limit calculated in one, function stops expanding.
-5. The mean of the range is calculated.
-6. The mean is subtracted from the entire row, then the normalise value added. Such that the data is now normalised to the defined value.
+5. The minimum of the range is calculated.
+6. The minimum is subtracted from the entire row, then the normalise value added. Such that the data is now normalised to the defined value.
 7. The row is returned to the full dataset and the algorithm moves on to the next.
 
 # References
