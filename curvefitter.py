@@ -29,7 +29,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     labelcolumns; first n columns are labels/text and are used to populate the output
     replicatecolumn; column containing the strings used to match replicatesexist
     waterwells; ignores wells on the outside of 96 well plate
-    replicatesexist; indicates presense of replicatesexist to be used for data sorting automatically runs normalise and align on replicatesexist to ensure most accurate GR
+    replicatesexist; indicates presence of replicatesexist to be used for data sorting automatically runs normalise and align on replicatesexist to ensure most accurate GR
     replicateignore; regex string that defines replicatesexist to be ignored ie 'Sample *' for BMG files
     normalise; value that data is normalised to at the start DO NOT USE 0 or log function will fail
     growthmin; minimum value required for growth to be counted and fitted, fitting purely flat functions consumes time for fitting and produces unreliable results
@@ -57,7 +57,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     # Process files before inputting
     filename = os.path.realpath(filename)
     if replicatesexist & os.path.isdir(filename) is True:
-        infile = multifilerepimport(filename, header, skiprows, labelcolumns, waterwells)
+        infile = multifilerepimport(filename, header, skiprows, labelcolumns)
         filepath = os.path.join(filename, 'curvefitter' + ' outputdata')
         filename = os.path.split(filename)[-1]
         infile = cleannonreps(infile, replicatecolumn, replicateignore)
@@ -80,7 +80,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         print('++++++++++Detected folder. Processing ' + str(len(files)) + ' files++++++++++')
         for i in range(0, len(files)):
             filename = files[i]
-            print('++++++++++ Processing file ++++++++++')
+            print('++++++++++ Processing file ' + filename +'++++++++++')
             print(filename)
             # Yay recursion
             curvefitter(filename=filename, header=header, predefinedinput=predefinedinput, skiprows=skiprows,
@@ -104,7 +104,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         datalength = infile.shape[1]
         firstline = infile.iloc[0, labelcolumns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
-
+        print('++++++++++ Processing file ' + filename + '++++++++++')
         print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
         for x in uniquereps: print(x)
         sys.stdout.flush()
@@ -119,13 +119,11 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
             infile = pd.read_csv(filename, header=header, skiprows=skiprows)
         except pd.parser.CParserError:
             infile = pd.read_excel(filename, header=header, skiprows=skiprows)
-
+        print('++++++++++ Processing file ' + filename + '++++++++++')
         filepath = os.path.split(filename)[0]
         filename = os.path.split(filename)[1]
         filename = filename.split('.')[-2]
         filepath = os.path.join(filepath, 'curvefitter' + ' outputdata')
-        if waterwells:
-            infile = removewaterwells(infile, labelcolumns)
 
         # Gather info about raw numerical data
         dataheight = infile.shape[0] - 1  # ignore time row
@@ -147,32 +145,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     time = time.iloc[labelcolumns:]
     time = np.float64(time)
 
-    # sanity check time
-    timecheck = time[np.logical_not(np.isnan(time))]
-    timecheck = np.gradient(timecheck)
-
-    if any(timecheck < 0):
-        print(
-            '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \nTime does not always increase along its length \n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-        print('Estimating missing values')
-        timegradient = np.diff(time)
-        meanstep = np.mean(timegradient)
-
-        for i in range(len(time) - 1):
-            if abs(time[i] - time[i + 1]) > meanstep * 1.5:
-                time[i + 1] = time[i] + meanstep
-
-    # sanity check data
-    for i in range(1, infile.shape[0]):
-        data = np.float64(infile.iloc[i, labelcolumns:].copy())
-        data = data[np.logical_not(np.isnan(data))]
-        if len(data) > len(timecheck):
-            raise RuntimeError('Error data is longer than time')
-        if len(data) > 0:
-            data = normalisetraces(data, normvalue=normalise, startnormalise=startnormalise)
-            if any(data <= 0):
-                raise ArithmeticError(
-                    'Error normalise value gives value <=0. Log function failed, please choose a larger value')
+    sanitychecks(infile, labelcolumns, normalise, startnormalise, time)
 
     try:
         for i in range(1, dataheight + 1):
@@ -380,6 +353,34 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     return
 
 
+def sanitychecks(infile, labelcolumns, normalise, startnormalise, time):
+    # sanity check time
+    timecheck = time[np.logical_not(np.isnan(time))]
+    timecheck = np.gradient(timecheck)
+    if any(timecheck < 0):
+        print(
+            '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \nTime does not always increase along its length \n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        print('Estimating missing values')
+        timegradient = np.diff(time)
+        meanstep = np.mean(timegradient)
+
+        for i in range(len(time) - 1):
+            if abs(time[i] - time[i + 1]) > meanstep * 1.5:
+                time[i + 1] = time[i] + meanstep
+
+    # sanity check data
+    for i in range(1, infile.shape[0]):
+        data = np.float64(infile.iloc[i, labelcolumns:].copy())
+        data = data[np.logical_not(np.isnan(data))]
+        if len(data) > len(timecheck):
+            raise RuntimeError('Error data is longer than time')
+        if len(data) > 0:
+            data = normalisetraces(data, normvalue=normalise, startnormalise=startnormalise)
+            if any(data <= 0):
+                raise ArithmeticError(
+                    'Error normalise value gives value <=0. Log function failed, please choose a larger value')
+
+
 def removewaterwells(indata, labelcols, deletewells=1):
     # deletewells removes from tables else forces points to zero
     cols = indata.iloc[:, 0]
@@ -419,7 +420,8 @@ def cleannonreps(indata, replicol, repignore):
     return indata
 
 
-def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
+def multifilerepimport(filedirectory, header, skiprows, labelcols):
+    # CSV import
     files = glob(os.path.join(filedirectory, '*.[cC][sS][vV]'))
     if len(files) is not 0:
         print('++++++++++ Found ' + str(len(files)) + ' files ++++++++++')
@@ -436,15 +438,13 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
                     time = pd.DataFrame(time)
 
         stackfile = time.transpose()
-
         for i in range(0, len(files)):
             newfile = pd.read_csv(files[i], header=header, skiprows=skiprows + 1)
             stackfile = stackfile.append(newfile, ignore_index=True)
 
-        if waterwells:
-            removewaterwells(stackfile, labelcols)
         return stackfile
     else:
+        # excel import
         files = glob(os.path.join(filedirectory, '*.[xX][lL][sS][xX]'))
         print('++++++++++ Found ' + str(len(files)) + ' files ++++++++++')
         for i in range(0, (len(files))):
@@ -464,8 +464,6 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
             newfile = pd.read_excel(files[i], header=header, skiprows=skiprows + 1)
             stackfile = stackfile.append(newfile, ignore_index=True)
 
-        if waterwells:
-            removewaterwells(stackfile, labelcols)
         return stackfile
 
 
@@ -486,8 +484,8 @@ def normalisetraces(dataset, normvalue=0.05, startnormalise=2):
             zeroingvalue = np.min(dataset[i, startpoint:ii - 1])
             zeroingvalue = normvalue - zeroingvalue
             dataset[i, :] = dataset[i, :] + zeroingvalue
-
         return dataset
+    # For single rows
     except IndexError:
         stdev = np.std(dataset[startpoint:startpoint + 5])
         limit = stdev * 2 + np.mean(dataset[startpoint:startpoint + 5])
@@ -559,6 +557,7 @@ def checkforgrowth(data, growthmin, normalise):
                     growth = False
             test[i] = growth
         return test
+    # For single rows
     except IndexError:
         growthminnorm = growthmin + normalise
         for i in range(0, data.shape[0] - 3):
