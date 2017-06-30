@@ -63,16 +63,16 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         infile = cleannonreps(infile, replicatecolumn, replicateignore)
 
         reps = infile.iloc[1:, replicatecolumn]
-        uniquereps = np.unique(reps)
+        unique_replicates = np.unique(reps)
 
         # Provide info about datashape for interation to use
-        dataheight = uniquereps.shape[0]
+        dataheight = unique_replicates.shape[0]
         datalength = infile.shape[1]
         firstline = infile.iloc[0, labelcolumns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
 
         print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
-        for x in uniquereps: print(x)
+        for x in unique_replicates: print(x)
         sys.stdout.flush()
 
     elif os.path.isdir(filename):
@@ -80,7 +80,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         print('++++++++++Detected folder. Processing ' + str(len(files)) + ' files++++++++++')
         for i in range(0, len(files)):
             filename = files[i]
-            print('++++++++++ Processing file ' + filename +'++++++++++')
+            print('++++++++++ Processing file ' + filename + '++++++++++')
             print(filename)
             # Yay recursion
             curvefitter(filename=filename, header=header, predefinedinput=predefinedinput, skiprows=skiprows,
@@ -98,15 +98,15 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
         infile = cleannonreps(infile, replicatecolumn, replicateignore)
         reps = infile.iloc[1:, replicatecolumn]
-        uniquereps = np.unique(reps)
+        unique_replicates = np.unique(reps)
 
-        dataheight = uniquereps.shape[0]
+        dataheight = unique_replicates.shape[0]
         datalength = infile.shape[1]
         firstline = infile.iloc[0, labelcolumns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
         print('++++++++++ Processing file ' + filename + '++++++++++')
         print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
-        for x in uniquereps: print(x)
+        for x in unique_replicates: print(x)
         sys.stdout.flush()
 
         filepath = os.path.split(filename)[0]
@@ -152,31 +152,31 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
             if replicatesexist:
                 location = '++++++++++ Processing replicate set ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
                 print(location)
-                repset = uniquereps[i - 1]
-                repselection = repset == infile.iloc[:, replicatecolumn]
-                od = infile.loc[repselection]
+                replicate_chosen = unique_replicates[i - 1]
+                replicate_index = replicate_chosen == infile.iloc[:, replicatecolumn]
+                od = infile.loc[replicate_index]
 
                 # Defines names for results
-                labels = pd.DataFrame([repset])
-                repinfo1 = 'Fitting ' + repset
-                print(repinfo1)
+                labels = pd.DataFrame([replicate_chosen])
+                replicate_info1 = 'Fitting ' + replicate_chosen
+                print(replicate_info1)
                 od = (od.iloc[:, labelcolumns:]).copy()
 
                 # Converts columns to float format for fitderiv
-                odfloat = np.array(od, dtype='float64')
-                odfloat = normalisetraces(odfloat, normalise, startnormalise)
-                odfloat = alignreplicates(odfloat, normalise, alignvalue)
-                noofreps = odfloat.shape[0]
-                repinfo2 = 'Found ' + str(noofreps) + ' replicates'
-                print(repinfo2)
+                od_float = np.array(od, dtype='float64')
+                od_float = normalise_traces(od_float, normalise, startnormalise)
+                od_float = align_replicates(od_float, normalise, alignvalue)
+                noofreps = od_float.shape[0]
+                replicate_info2 = 'Found ' + str(noofreps) + ' replicates'
+                print(replicate_info2)
 
                 # Removes NaNs from analysis
-                nantest = np.isnan(odfloat)
+                nantest = np.isnan(od_float)
                 for ii in range(0, nantest.shape[1]):
                     if any(nantest[:, ii]):
                         x = ii - 1
                         break
-                odfloat = odfloat[:, :ii]
+                od_float = od_float[:, :ii]
                 t = time[:ii]
                 if noofreps == 0:
                     growthfound = False
@@ -194,27 +194,27 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 labels = labels.copy()
 
                 # Converts columns to float format for fitderiv
-                odfloat = np.array(od, dtype='float64')
-                odfloat = normalisetraces(odfloat, normalise, startnormalise)
+                od_float = np.array(od, dtype='float64')
+                od_float = normalise_traces(od_float, normalise, startnormalise)
 
                 # Removes NaNs from analysis
-                nantest = np.isnan(odfloat)
+                nantest = np.isnan(od_float)
                 for ii in range(0, len(nantest)):
                     if nantest[ii]:
                         x = ii - 1
                         break
-                odfloat = odfloat[:ii]
+                od_float = od_float[:ii]
                 t = time[:ii]
 
                 # Check for growth
-                growthfound = checkforgrowth(odfloat, growthmin, normalise)
+                growthfound = check_for_growth(od_float, growthmin, normalise)
             sys.stdout.flush()  # Forces prints to display immediately
 
             if growthfound:
                 # Runs fitderiv only if growth is over growthmin
                 for attemptno in range(5):
                     try:
-                        fitty = fitderiv(t, np.transpose(odfloat), bd=fitparams, exitearly=False, nosamples=nosamples,
+                        fitty = fitderiv(t, np.transpose(od_float), bd=fitparams, exitearly=False, nosamples=nosamples,
                                          noruns=noruns, logs=logdata)  # Peters program
                         break
                     except KeyboardInterrupt:
@@ -264,7 +264,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                     plt.xlabel('Time [h]')
 
                     if replicatesexist:
-                        picname = repset
+                        picname = replicate_chosen
                     elif predefinedinput == 'BMG':
                         picname = labels.iloc[0] + str(labels.iloc[1])
                     elif len(labels) == 1:
@@ -375,26 +375,26 @@ def sanitychecks(infile, labelcolumns, normalise, startnormalise, time):
         if len(data) > len(timecheck):
             raise RuntimeError('Error data is longer than time')
         if len(data) > 0:
-            data = normalisetraces(data, normvalue=normalise, startnormalise=startnormalise)
+            data = normalise_traces(data, normvalue=normalise, startnormalise=startnormalise)
             if any(data <= 0):
                 raise ArithmeticError(
                     'Error normalise value gives value <=0. Log function failed, please choose a larger value')
 
 
-def removewaterwells(indata, labelcols, deletewells=1):
+def remove_waterwells(indata, labelcols, deletewells=1):
     # deletewells removes from tables else forces points to zero
     cols = indata.iloc[:, 0]
-    colindex = (cols == 'A') | (cols == 'H')
+    column_index = (cols == 'A') | (cols == 'H')
     cols = indata.iloc[:, 1]
-    colindex = (cols == 1) | (cols == 12) | colindex
+    column_index = (cols == 1) | (cols == 12) | column_index
     if deletewells == 1:
-        colindex = colindex == False
-        data = indata.loc[colindex]
+        column_index = column_index == False
+        data = indata.loc[column_index]
         data = data.copy()
     else:
         data = indata.copy()
-        for i in range(0, len(colindex)):
-            if 1 == colindex[i]:
+        for i in range(0, len(column_index)):
+            if 1 == column_index[i]:
                 data.iloc[[i], 3:] = np.zeros(data.shape[1] - 3)
     return data
 
@@ -467,14 +467,14 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols):
         return stackfile
 
 
-def normalisetraces(dataset, normvalue=0.05, startnormalise=2):
+def normalise_traces(dataset, normvalue=0.05, startnormalise=2):
     startpoint = startnormalise
     # Normalises line by line on points 5:15
     try:
         x = dataset.shape[1]
         for i in range(0, dataset.shape[0]):
             stdev = np.std(dataset[i, startpoint:startpoint + 5])
-            limit = stdev * 2 + np.mean(dataset[i,startpoint:startpoint + 5])
+            limit = stdev * 2 + np.mean(dataset[i, startpoint:startpoint + 5])
             for ii in range(startpoint + 3, dataset.shape[1]):
                 newpoint = dataset[i, ii]
                 if newpoint > limit:
@@ -503,9 +503,9 @@ def normalisetraces(dataset, normvalue=0.05, startnormalise=2):
         raise
 
 
-def alignreplicates(dataset, normvalue=0.05, alignvalue=0.1):
+def align_replicates(dataset, normvalue=0.05, alignvalue=0.1):
     if alignvalue is not None:
-        diff = checkforgrowth(dataset, alignvalue, normvalue)
+        diff = check_for_growth(dataset, alignvalue, normvalue)
         invdiff = np.logical_not(diff)
         if np.any(invdiff):
             print('Error, replicate does not reach alignvalue, dropping from alignment')
@@ -543,7 +543,7 @@ def alignreplicates(dataset, normvalue=0.05, alignvalue=0.1):
         return dataset
 
 
-def checkforgrowth(data, growthmin, normalise):
+def check_for_growth(data, growthmin, normalise):
     try:
         test = np.array(range(0, data.shape[0]))
         for i in range(0, data.shape[0]):
