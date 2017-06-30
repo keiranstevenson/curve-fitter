@@ -21,7 +21,7 @@ from fitderiv import fitderiv
 def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelcolumns=3, replicatecolumn=3,
                 replicatesexist=False, replicateignore=None, normalise=0.05, growthmin=0.05, alignvalue=0.1,
                 fitparams={0: [-5, 8], 1: [-6, -1], 2: [-5, 2]}, noruns=5, nosamples=20, logdata=True,
-                makeplots=True, showplots=False):
+                makeplots=True, showplots=False, startnormalise=1):
     '''
     filename: filename or folder location (only if replicatesexist==1)
     predefinedinput: 'BMG' sets skiprows, labelcolumns, replicatecolumn and replicateignore based on standard format for BMG platereader files
@@ -52,6 +52,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
     waterwells = False  # no longer necessary but left
     replicatecolumn = replicatecolumn - 1  # converts to index from number
+    startnormalise = startnormalise - 1
 
     # Process files before inputting
     filename = os.path.realpath(filename)
@@ -167,7 +168,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         data = data[np.logical_not(np.isnan(data))]
         if len(data) > len(timecheck):
             raise RuntimeError('Error data is longer than time')
-        data = normalisetraces(data, normvalue=normalise)
+        data = normalisetraces(data, normvalue=normalise, startnormalise=startnormalise)
         if any(data <= 0):
             raise ArithmeticError(
                 'Error normalise value gives value <=0. Log function failed, please choose a larger value')
@@ -189,7 +190,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
                 # Converts columns to float format for fitderiv
                 odfloat = np.array(od, dtype='float64')
-                odfloat = normalisetraces(odfloat, normalise)
+                odfloat = normalisetraces(odfloat, normalise, startnormalise)
                 odfloat = alignreplicates(odfloat, normalise, alignvalue)
                 noofreps = odfloat.shape[0]
                 repinfo2 = 'Found ' + str(noofreps) + ' replicates'
@@ -220,7 +221,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
                 # Converts columns to float format for fitderiv
                 odfloat = np.array(od, dtype='float64')
-                odfloat = normalisetraces(odfloat, normalise)
+                odfloat = normalisetraces(odfloat, normalise, startnormalise)
 
                 # Removes NaNs from analysis
                 nantest = np.isnan(odfloat)
@@ -248,12 +249,12 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                         version = platform.architecture()[0]
                         if version == '32bit':
                             raise MemoryError(
-                                'Out of Memory while fitting. Try installing 64-bit python or using fewer replicatesexist')
+                                'Out of Memory while fitting. Try installing 64-bit python or using fewer replicates')
                         elif version == '64bit':
-                            raise MemoryError('Out of memory while fitting. Try using fewer replicatesexist')
+                            raise MemoryError('Out of memory while fitting. Try using fewer replicates')
                         else:
                             raise MemoryError(
-                                'Out of memory while fitting. Unable to determine python version, try making more memory available or using fewer replicatesexist')
+                                'Out of memory while fitting. Unable to determine python version, try making more memory available or using fewer replicates')
 
                     except:
                         print('Fitting failure, retrying')
@@ -467,18 +468,32 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
         return stackfile
 
 
-def normalisetraces(dataset, normvalue=0.05):
+def normalisetraces(dataset, normvalue=0.05, startpoint=2):
     # Normalises line by line on points 5:15
     try:
         x = dataset.shape[1]
         for i in range(0, dataset.shape[0]):
-            zeroingvalue = np.mean(dataset[i, 4:14])
+            stdev = np.std(dataset[i, startpoint:startpoint + 5])
+            limit = stdev * 2
+            for ii in range(startpoint + 3, dataset.shape[1]):
+                newstdev = np.std(dataset[i, startpoint:ii])
+                if newstdev > limit:
+                    break
+            zeroingvalue = np.mean(dataset[i, startpoint:ii-1])
+            # zeroingvalue = np.mean(dataset[i, 4:14])
             zeroingvalue = normvalue - zeroingvalue
             dataset[i, :] = dataset[i, :] + zeroingvalue
 
         return dataset
     except IndexError:
-        zeroingvalue = np.mean(dataset[4:14])
+        stdev = np.std(dataset[startpoint:startpoint + 5])
+        limit = stdev * 2
+        for ii in range(startpoint + 3, dataset.shape[0]):
+            newstdev = np.std(dataset[startpoint:ii])
+            if newstdev > limit:
+                break
+        zeroingvalue = np.mean(dataset[startpoint:ii-1])
+        # zeroingvalue = np.mean(dataset[i, 4:14])
         zeroingvalue = normvalue - zeroingvalue
         dataset = dataset + zeroingvalue
         return dataset

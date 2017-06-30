@@ -8,28 +8,30 @@ The original fitting algorithm is provided in this package as well and can be ru
 * Replicates are normalised and aligned in time before fitting for accurate growth rate reporting
 * Software automatically drops replicates that show no growth
 
-## Dependences
+## Dependencies
 Scipy
 
 # How to use curve-fitter
+```Python
 curvefitter(filename)
 curvefitter(predefinedinput= 'BMG')
 curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, labelcolumns= 3, replicatecolumn= 3, replicatesexist= False, replicateignore= None, normalise= 0.05, growthmin= 0.05, alignvalue= 0.1, fitparams= {0:[-5,8], 1:[-6,-1], 2:[-5,2]}, noruns= 5, nosamples= 20, makeplots = True, showplots= True):
-
+```
 ### Parameters
 
 |Parameter|Definition|Type|Default|
 |---|---|---|---|
-filename |Filename or folder location. If a folder is given and replicates is True, then all files will be imported and any replicates with shared strings will be fitted together|string| N/A
+filename |Filename or folder location. If a folder is given and replicatesexist is True, then all files will be imported and any replicates with shared strings will be fitted together|string| N/A
 predefinedinput|'BMG' sets skiprows, labelcols, replicols and repignore based on standard format for BMG platereader files|string or None|None
 skiprows| Lines of input file to skip before retrieving data. First row assumed as time with data following immediately below| Integer| 0
 labelcolumns| The number of columns at the start of the table that are not data.| integer| 3
 replicatesexist| Indicates presence of replicates to be used for data sorting. This runs alignment on replicates to ensure most accurate GR. | boolean| False
+replicatecolumn| Column containing the strings used to match replicates. Rows with an exact match in cells in this column will be fitted together as replicates| integer| 3
 replicateignore| If true, rows with replicatecolumn = ignore will be skipped by analysis. This allows for ignoring wells that show growth but are not required| boolean| True
-replicatecolumn| Column containing the strings used to match replicates. Rows with an exact match (including whitespace if string) in this column will be fitted together as replicates| integer| 3
-normalise| Value that data is normalised to before fitting. Data is normalised such that the mean value of points 5-15 is equal to normalise. DO NOT USE 0(zero) or log function will fail|float| 0.05
+normalise| Value that data is normalised to before fitting. See below for normalisation routine. See below|float| 0
+startnormalise| Index at which the normalisation function starts|integer|1
 growthmin| Minimum value required for growth to be counted and fitted. Growth is determined as anywhere 3 consecutive points are greater than growthmin+normalise value for the curve. Fitting purely flat functions consumes time for fitting and produces unreliable results| float| 0.05
-alignvalue| Aligns replicates so that this value is reached at the same time for all reps, if alignvalue=None then it is skipped. Align value must be >= growthmin. | float or None| 0.1
+alignvalue| Aligns replicates so that this value is reached at the same time for all reps, if alignvalue=None then it is skipped. Align value must be >= growthmin. Replicates failing to meet this value will be dropped from analysis.| float or None| 0.1
 
 |Parameters passed to Swain fitting routine|Definition (see Swain site below for better details)|Type|Default|
 |---|---|---|---|
@@ -70,8 +72,8 @@ Output structure:
 \datalocation\
             inputfile.xlsx
              \curvefitter outputdata\
-                                    inputfile Analysed
-                                    inputfile 2 Analysed
+                                    inputfile Analysed.xlsx
+                                    inputfile 2 Analysed.xlsx
                                     \inputfile plots\
                                                     Control.png
                                                     Cond1.png
@@ -84,7 +86,14 @@ Further examples of program calls and files are present in the examplefileimport
 ### Alignment procedure
 Alignment point is determined at an index i where the values at i, i+1 and i+2 are greater than alignvalue+normalise. Where i for one replicate is greater than the i of another, data is deleted from the start of the longer replicate until both  i's are equal.
 ### Normalising procedure
-
+The variable of startnormalise is made editable as the minimal regions may not be at the start of a given dataset. The normalising routine looks for the largest region following this start index where no change is seen (variation below two standard deviations)
+1. A single row is taken from the full dataset
+2. The standard deviation of the range startnormalise:startnormalise+5 is calculated. This is then multiplied by two and set as the limit for step 4
+3. The range is expanded incrementally and standard deviation recalculated.
+4. If this new standard deviation is greater than limit calculated in one, function stops expanding.
+5. The mean of the range is calculated.
+6. The mean is subtracted from the entire row, then the normalise value added. Such that the data is now normalised to the defined value.
+7. The row is returned to the full dataset and the algorithm moves on to the next.
 
 # References
 The original fitting routine can be found here: http://swainlab.bio.ed.ac.uk/software/fitderiv/
