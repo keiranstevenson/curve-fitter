@@ -1,7 +1,7 @@
-import numpy as np
-import genutils as gu
 import gaussianprocess as gp
+import genutils as gu
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 

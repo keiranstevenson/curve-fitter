@@ -20,7 +20,7 @@ from fitderiv import fitderiv
 
 def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelcolumns=3, replicatecolumn=3,
                 replicatesexist=False, replicateignore=None, 
-                normalise=0.05, normby=(4,14), growthmin=0.05, alignvalue=0.1,
+                normalise=0, normby=(4,14), growthmin=0.05, alignvalue=0.1,
                 fitparams={0: [-5, 8], 1: [-6, -1], 2: [-5, 2]}, noruns=5, nosamples=20, logdata=True,
                 makeplots=True, showplots=False, startnormalise=1):
     '''
@@ -32,7 +32,8 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
     waterwells; ignores wells on the outside of 96 well plate
     replicatesexist; indicates presence of replicatesexist to be used for data sorting automatically runs normalise and align on replicatesexist to ensure most accurate GR
-    replicateignore; regex string that defines replicatesexist to be ignored ie 'Sample *' for BMG files
+    replicateignore; regex string that defines replicatesexist to be ignored ie 'Sample
+     ' for BMG files
     normalise; value that data is normalised to at the start DO NOT USE 0 or log function will fail
     growthmin; minimum value required for growth to be counted and fitted, fitting purely flat functions consumes time for fitting and produces unreliable results
     alignvalue; aligns replicatesexist so that this value is reached at the same time for all reps
@@ -52,6 +53,8 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         skiprows = 63
         labelcolumns = 1
 
+    if normalise != 0:
+        print('WARNING: ALL DATA WILL BE NORMALISED TO ZERO')
     waterwells = False  # no longer necessary but left
     replicatecolumn = replicatecolumn - 1  # converts to index from number
     startnormalise = startnormalise - 1
@@ -480,18 +483,19 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols):
 
 
 
-def normalise_traces(dataset, normvalue=0.05, normby=(4,14)):
+def normalise_traces(dataset, normvalue=0, normby=(4,14)):
     # Normalises line by line on points 5:15
+    normvalue = 10**(-2)
     try:
         x = dataset.shape[1]
         for i in range(0, dataset.shape[0]):
-            zeroingvalue = np.mean(dataset[i, normby[0]:normby[1]])
+            zeroingvalue = np.min(dataset[i,:])
             zeroingvalue = normvalue - zeroingvalue
             dataset[i, :] = dataset[i, :] + zeroingvalue
         return dataset
     # For single rows
     except IndexError:
-        zeroingvalue = np.mean(dataset[normby[0]:normby[1]])
+        zeroingvalue = np.min(dataset[:])
         zeroingvalue = normvalue - zeroingvalue
         dataset = dataset + zeroingvalue
         return dataset

@@ -21,10 +21,10 @@
      
 """
 
+import genutils as gu
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy import linalg
-import matplotlib.pyplot as plt
-import genutils as gu
 
 
 class gaussianprocess:

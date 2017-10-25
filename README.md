@@ -50,17 +50,19 @@ The settings that you obtain can then be fed into the curve-fitter program to be
 ### Input file format
 Files should either be a csv or xlsx with the data in a row oriented format. The first line read by the program is taken as the time input.
 
-#### example of input values
-<img src=".\Images\Slide1.PNG" width="600" height="500"/>
+#### example of input values and their effect on input
+If replicatesexist is False
+<img src=".\Images\Slide1.PNG" width="640" height="360"/>
+If replicatesexist is True
+<img src=".\Images\Slide2.PNG" width="640" height="360"/>
 
-![](.\Images\Slide2.PNG =500x)
+For example after filtering with replicatesexist = True, the program will find the first point at which OD>growthmin
+<img src=".\Images\Slide3.PNG" width="640" height="360"/>
+Program then finds where values are greater than alignby, and aligns
+<img src=".\Images\Slide4.PNG" width="640" height="360"/>
 
-![](.\Images\Slide3.PNG)
-
-![](.\Images\Slide4.PNG)
-
-Final ouptu
-![](.\Images\Slide5.PNG)
+Final output
+<img src=".\Images\Slide5.PNG" width="640" height="360"/>
 
 Further examples of program calls and files are present in the examplefileimport.py script and examples folder.
 # Further information

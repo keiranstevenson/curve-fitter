@@ -26,6 +26,9 @@ cfit(filename, labelcolumns=3, replicatecolumn=3, skiprows=6, normalise=0.1, nor
 # filename = 'Datafiles/'
 # cfit(filename, predefinedinput='BMG', showplots=False,normalise=1)
 
+# filename = 'Demofiles/testdata2.csv'
+# cfit(filename,skiprows=1,labelcolumns=1,normalise=0.05,normby=(0,5))
+
 
 print('YAY! No errors!')
 
