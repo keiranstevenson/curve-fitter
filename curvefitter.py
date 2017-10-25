@@ -19,7 +19,8 @@ from fitderiv import fitderiv
 
 
 def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelcolumns=3, replicatecolumn=3,
-                replicatesexist=False, replicateignore=None, normalise=0.05, growthmin=0.05, alignvalue=0.1,
+                replicatesexist=False, replicateignore=None, 
+                normalise=0.05, normby=(4,14), growthmin=0.05, alignvalue=0.1,
                 fitparams={0: [-5, 8], 1: [-6, -1], 2: [-5, 2]}, noruns=5, nosamples=20, logdata=True,
                 makeplots=True, showplots=False, startnormalise=1):
     '''
@@ -28,6 +29,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     skiprows; lines of input file to skip before retrieving data. First row assumed as time with data following immediately below
     labelcolumns; first n columns are labels/text and are used to populate the output
     replicatecolumn; column containing the strings used to match replicatesexist
+
     waterwells; ignores wells on the outside of 96 well plate
     replicatesexist; indicates presence of replicatesexist to be used for data sorting automatically runs normalise and align on replicatesexist to ensure most accurate GR
     replicateignore; regex string that defines replicatesexist to be ignored ie 'Sample *' for BMG files
@@ -65,11 +67,13 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         reps = infile.iloc[1:, replicatecolumn]
         unique_replicates = np.unique(reps)
 
+
         # Provide info about datashape for interation to use
         dataheight = unique_replicates.shape[0]
         datalength = infile.shape[1]
         firstline = infile.iloc[0, labelcolumns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
+
 
         print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
         for x in unique_replicates: print(x)
@@ -95,6 +99,9 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
             infile = pd.read_csv(filename, header=header, skiprows=skiprows)
         except pd.parser.CParserError:
             infile = pd.read_excel(filename, header=header, skiprows=skiprows)
+        except pd.parser.ParserError:
+            infile = pd.read_excel(filename, header=header, skiprows=skiprows)
+
 
         infile = cleannonreps(infile, replicatecolumn, replicateignore)
         reps = infile.iloc[1:, replicatecolumn]
@@ -102,11 +109,13 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
         dataheight = unique_replicates.shape[0]
         datalength = infile.shape[1]
+
         firstline = infile.iloc[0, labelcolumns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
         print('++++++++++ Processing file ' + filename + '++++++++++')
         print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
         for x in unique_replicates: print(x)
+
         sys.stdout.flush()
 
         filepath = os.path.split(filename)[0]
@@ -114,12 +123,14 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         filename = filename.split('.')[-2]
         filepath = os.path.join(filepath, 'curvefitter' + ' outputdata')
 
-    elif os.path.isfile(filename):
+    elif os.path.isfile(filename) is True:
         try:
             infile = pd.read_csv(filename, header=header, skiprows=skiprows)
         except pd.parser.CParserError:
             infile = pd.read_excel(filename, header=header, skiprows=skiprows)
-        print('++++++++++ Processing file ' + filename + '++++++++++')
+        except pd.parser.ParserError:
+            infile = pd.read_excel(filename, header=header, skiprows=skiprows)
+
         filepath = os.path.split(filename)[0]
         filename = os.path.split(filename)[1]
         filename = filename.split('.')[-2]
@@ -145,7 +156,8 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     time = time.iloc[labelcolumns:]
     time = np.float64(time)
 
-    sanitychecks(infile, labelcolumns, normalise, startnormalise, time)
+
+    sanitychecks(infile, labelcolumns, normalise, normby, time)
 
     try:
         for i in range(1, dataheight + 1):
@@ -164,7 +176,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
                 # Converts columns to float format for fitderiv
                 od_float = np.array(od, dtype='float64')
-                od_float = normalise_traces(od_float, normalise, startnormalise)
+                od_float = normalise_traces(od_float, normalise, normby)
                 od_float = align_replicates(od_float, normalise, alignvalue)
                 noofreps = od_float.shape[0]
                 replicate_info2 = 'Found ' + str(noofreps) + ' replicates'
@@ -183,7 +195,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 else:
                     growthfound = True
             else:
-                location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
+                location = '++++++++++ Processing row {:03} of {:03} ++++++++++'.format(i, dataheight)
                 print(location)
                 od = infile.iloc[i]
                 od = od[labelcolumns + 1:]
@@ -195,7 +207,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
                 # Converts columns to float format for fitderiv
                 od_float = np.array(od, dtype='float64')
-                od_float = normalise_traces(od_float, normalise, startnormalise)
+                od_float = normalise_traces(od_float, normalise, normby)
 
                 # Removes NaNs from analysis
                 nantest = np.isnan(od_float)
@@ -353,7 +365,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     return
 
 
-def sanitychecks(infile, labelcolumns, normalise, startnormalise, time):
+def sanitychecks(infile, labelcolumns, normalise, normby, time):
     # sanity check time
     timecheck = time[np.logical_not(np.isnan(time))]
     timecheck = np.gradient(timecheck)
@@ -375,7 +387,7 @@ def sanitychecks(infile, labelcolumns, normalise, startnormalise, time):
         if len(data) > len(timecheck):
             raise RuntimeError('Error data is longer than time')
         if len(data) > 0:
-            data = normalise_traces(data, normvalue=normalise, startnormalise=startnormalise)
+            data = normalise_traces(data, normvalue=normalise, normby=normby)
             if any(data <= 0):
                 raise ArithmeticError(
                     'Error normalise value gives value <=0. Log function failed, please choose a larger value')
@@ -467,35 +479,19 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols):
         return stackfile
 
 
-def normalise_traces(dataset, normvalue=0.05, startnormalise=2):
-    startpoint = startnormalise
+
+def normalisetraces(dataset, normvalue=0.05, normby=(4,14)):
     # Normalises line by line on points 5:15
     try:
         x = dataset.shape[1]
         for i in range(0, dataset.shape[0]):
-            stdev = np.std(dataset[i, startpoint:startpoint + 5])
-            limit = stdev * 2 + np.mean(dataset[i, startpoint:startpoint + 5])
-            for ii in range(startpoint + 3, dataset.shape[1]):
-                newpoint = dataset[i, ii]
-                if newpoint > limit:
-                    break
-            # zeroingvalue = np.mean(dataset[i, startpoint:ii-1])
-            # zeroingvalue = np.mean(dataset[i, 4:14])
-            zeroingvalue = np.min(dataset[i, startpoint:ii - 1])
+            zeroingvalue = np.mean(dataset[i, normby[0]:normby[1]])
             zeroingvalue = normvalue - zeroingvalue
             dataset[i, :] = dataset[i, :] + zeroingvalue
         return dataset
     # For single rows
     except IndexError:
-        stdev = np.std(dataset[startpoint:startpoint + 5])
-        limit = stdev * 2 + np.mean(dataset[startpoint:startpoint + 5])
-        for ii in range(startpoint + 3, dataset.shape[0]):
-            newpoint = dataset[ii]
-            if newpoint > limit:
-                break
-        # zeroingvalue = np.mean(dataset[startpoint:ii-1])
-        # zeroingvalue = np.mean(dataset[i, 4:14])
-        zeroingvalue = np.min(dataset[startpoint:ii - 1])
+        zeroingvalue = np.mean(dataset[normby[0]:normby[1]])
         zeroingvalue = normvalue - zeroingvalue
         dataset = dataset + zeroingvalue
         return dataset

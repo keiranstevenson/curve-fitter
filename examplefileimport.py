@@ -9,6 +9,7 @@ from curvefitter import curvefitter as cfit
 
 ## This test takes a while due to high number of replicates
 # filename = 'Datafiles/multireptest/'
+
 # cfit(filename, predefinedinput= 'BMG', replicatesexist=True, noruns=1, nosamples=4)
 
 # filename = 'Datafiles/Shorttest.CSV'
@@ -26,3 +27,4 @@ filename = 'Datafiles/'
 cfit(filename, predefinedinput='BMG', showplots=False)
 
 print('YAY! No errors!')
+

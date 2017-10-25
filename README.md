@@ -29,6 +29,7 @@ replicatesexist| Indicates presence of replicates to be used for data sorting. T
 replicatecolumn| Column containing the strings used to match replicates. Rows with an exact match in cells in this column will be fitted together as replicates| integer| 3
 replicateignore| If true, rows with replicatecolumn = ignore will be skipped by analysis. This allows for ignoring wells that show growth but are not required| boolean| True
 normalise| Value that data is normalised to before fitting. See below for normalisation routine. See below|float| 0
+normby| Touple of two values that define the range that is normalised to normalise value|touple of ints|(4,14)
 startnormalise| Index at which the normalisation function starts|integer|1
 growthmin| Minimum value required for growth to be counted and fitted. Growth is determined as anywhere 3 consecutive points are greater than growthmin+normalise value for the curve. Fitting purely flat functions consumes time for fitting and produces unreliable results| float| 0.05
 alignvalue| Aligns replicates so that this value is reached at the same time for all reps, if alignvalue=None then it is skipped. Align value must be >= growthmin. Replicates failing to meet this value will be dropped from analysis.| float or None| 0.1
@@ -49,38 +50,18 @@ The settings that you obtain can then be fed into the curve-fitter program to be
 ### Input file format
 Files should either be a csv or xlsx with the data in a row oriented format. The first line read by the program is taken as the time input.
 
-#### example input
-For the table below:
+#### example of input values
+<img src=".\Images\Slide1.PNG" width="600" height="500"/>
 
-|rowno\columnno|1|2|3|4|5|...|
-|---|---|---|---|---|---|---|
-1|Row|Column|Name|read1|read2
-2|Row|Column|Name|0|0.1
-3|A|1|Control|0.1|0.2
-4|A|2|Cond1|0.1|0.2
-5|A|2|Cond1|0.1|0.2
-...|
+![](.\Images\Slide2.PNG =500x)
 
-```Python
-from curvefitter import curvefitter
+![](.\Images\Slide3.PNG)
 
-curvefitter('Example.xlsx', skiprows=1, labelcols=3, replicols=3, replicates=True)
-```
-Row 4 and 5 will be fitted together as replicates, row 3 will be fitted on its own. Graphs will be displayed with each fitting and saved to the output folder.
-```
-Output structure:
-\datalocation\
-            inputfile.xlsx
-             \curvefitter outputdata\
-                                    inputfile Analysed.xlsx
-                                    inputfile 2 Analysed.xlsx
-                                    \inputfile plots\
-                                                    Control.png
-                                                    Cond1.png
-                                    \inputfile 2 plots\
-                                                    Control.png
-                                                    Cond1.png  
-```
+![](.\Images\Slide4.PNG)
+
+Final ouptu
+![](.\Images\Slide5.PNG)
+
 Further examples of program calls and files are present in the examplefileimport.py script and examples folder.
 # Further information
 ### Alignment procedure
