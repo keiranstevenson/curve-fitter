@@ -15,11 +15,10 @@ matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from fitderiv import fitderiv
 import numpy as np
-import genutils as gu
 import pandas as pd
 from os import path
 
-
+# Version 1.01
 
 class GuiOutput():
     font= ('courier', 16, 'normal')
@@ -31,7 +30,7 @@ class GuiOutput():
         self.text.insert(END, str(text))
         self.text.see(END)
         self.text.update()                       # update gui after each line
-    def writelines(self, lines):                 
+    def writelines(self, lines):
         for line in lines: self.write(line)
 
 
@@ -46,7 +45,7 @@ class fitgui(Frame):
     minh= -10
     maxh= 10
 
-    
+
     def __init__(self, parent= None):
         '''
         Set up main window
@@ -55,7 +54,7 @@ class fitgui(Frame):
         --
         parent: potential enclosing frame
         '''
-        
+
         Frame.__init__(self, parent)
         self.pack(expand= YES, fill= BOTH)
 
@@ -99,8 +98,8 @@ class fitgui(Frame):
         gout= GuiOutput(self.bf)
         sys.stderr= gout
         sys.stdout= gout
-        
-        
+
+
     def quit(self):
         '''
         Quit GUI
@@ -122,28 +121,30 @@ class fitgui(Frame):
         hscrollbar.config(command= htext.yview)
         htext.config(yscrollcommand= hscrollbar.set)
         htext.config(font= ('helvetica', 20), width= 40, height= 24, wrap= WORD)
-        htext.insert(END, '1. Load the data set. Data can be from Excel or as a .txt or .dat (data separated by spaces) or .csv (data separated by commas) file with the measurement times first (in any units) and then the corresponding OD measurements. Replicate OD measurements can also be included. The data can be in either rows or columns (the software assumes more time pints than replicates).\n\n')
+        htext.insert(END, '1. Load the data set. Data can be from Excel or as a .txt or .dat (data separated by spaces) or .csv (data separated by commas) file with the measurement times first (in any units) and then the corresponding OD measurements. Replicate OD measurements can also be included. The data can be in either rows or columns (the software assumes more time points than replicates).\n\n')
         htext.tag_add('no', '1.0', '1.2')
         htext.insert(END, '2. Select which of the replicates to fit.\n\n')
         htext.tag_add('no', '3.0', '3.2')
         htext.insert(END, '3. Choose the number of samples for estimating statistics, such as the maximum growth rate and lag time. Latent functions (and their time-derivative) consistent with the data are sampled, the statistics calculated for each sample latent function, and the average statistic over all samples displayed.\n\nMore samples give more robust measurements but take more computing time.\n\n')
         htext.tag_add('no', '5.0', '5.2')
-        htext.insert(END, '4. The maximum and minimum possible values of the hyperparameters can be changed using the sliders. The bounds are given in log10 space and so, for example, -1 specifies a bound of 0.1 in real space. \n\nThe first hyperparameter determines the magnitude of the variation in the fitted curve; the second hyperparameter determines how flexible the curve will be (smaller values imply a straighter curve); and the third hyperparameter determines the magnitude of the measurement error.\n\nIf the fit is poorly following the data, we recommend decreasing the upper bound on the measurement error.\n\n')
+        htext.insert(END, '4. The maximum and minimum possible values of the hyperparameters can be changed using the sliders. The bounds are given in log10 space and so, for example, -1 specifies a bound of 0.1 in real space. \n\nHyperparameter 0 determines the amplitude (the magnitude of the variation) in the fitted curve; hyperparameter 1 determines how flexible the curve will be (smaller values imply a straighter curve); and hyperparameter 2 determines the magnitude of the measurement error.\n\nIf the fit is poorly following the data, we recommend decreasing the upper bound on the measurement error.\n\n')
         htext.tag_add('no', '9.0', '9.2')
         htext.insert(END, '5. Run the fit.\n\nAn initial random guess for the best-fit hyperparameters is made and then optimized.\n\nChanging the bounds on the hyperparameters may improve the fitting.\n\n')
         htext.tag_add('no', '15.0', '15.2')
-        htext.insert(END, '6. The results of the fit are displayed both numerically and graphically.\n\nThe logarithm of the maximum likelihood is shown for the fit of each replicate with a higher value implying a better fit. A warning is given if a best-fit hyperparameter lies on a boundary, but having a hyperparameter on a boundary does not necessarily imply a bad fit. It is often best to judge the fit visually.\n\nTwo graphs are produced: one of the natural logarithm of the OD data and the best fit of this OD data and the other of the inferred growth rate, both as a function of time. The best-fit is shown in dark blue (the mean of the Gaussian process with the best-fit hyperparameters) and the estimated error (the standard deviation) is shown in light blue.\n\nThe maximum growth rate, the corresponding doubling time, the maximum value reached by the OD, and the lag time are also calculated.\n\n')
+        htext.insert(END, '6. The results of the fit are displayed both numerically and graphically.\n\nThe logarithm of the maximum likelihood is shown for the fit of each replicate with a higher value implying a better fit. A warning is given if a best-fit hyperparameter lies on a boundary, but having a hyperparameter on a boundary does not necessarily imply a bad fit. It is often best to judge the fit visually.\n\nTwo graphs in one figure are produced: one of the natural logarithm of the OD data and the best fit of this OD data and the other of the inferred growth rate, both as a function of time. The best-fit is shown in dark blue (the mean of the Gaussian process with the best-fit hyperparameters) and the estimated error (the standard deviation) is shown in light blue.\n\nThe maximum growth rate, the time at which this maximum growth rate occurs, the corresponding doubling time, the maximum value reached by the OD, and the lag time are also calculated.\n\n')
         htext.tag_add('no', '21.0', '21.2')
         htext.insert(END, '7. The results of the fit can be exported. The measurement times, the best-fit OD curve, the error-bar for this best-fit OD curve (the standard deviation), the inferred growth rate, the error-bar for this growth rate, and the original OD data used in the fit are all exported in one file (either .xlsx, .csv, .txt, or .dat). The statistics describing the growth curve are automatically exported in another.\n\n')
         htext.tag_add('no', '29.0', '29.2')
         htext.insert(END, '8. Three further fitting parameters can be specified.\n\nThe number of runs of the optimization routine can be increased. With multiple runs, the best result is taken (the one with the highest likelihood).\n\nThe natural logarithm of the data is taken by default (as is typical for fitting optical densities), but the original data can be fit instead by toggling the "Log data" box. \n\nA parameter describing the magnitude of the measurement errors is fit by default. An underlying assumption of this fitting is that the typical size of the measurement errors does not change with time. If the data do not appear to have a uniform measurement error, then the relative magnitude of the measurement error can be empirically estimated by toggling the "Non-uniform errors" box, although there must be multiple replicates to do so.\n\n')
         htext.tag_add('no', '31.0', '31.2')
-        htext.insert(END, '9. Trouble-shooting:\n\nIf there is a poor fit for the data, try decreasing the upper bound on the hyperparameter for the measurement error.\n\nIf the best-fit appears to change when you re-run the fitting, then the optimization is probably finding a local optimum. Try increasing the number of runs, say to 3.\n\nIf the inferred growth rate is too "noisy", try decreasing the upper bound on the hyperparameter for the flexibility.')
-        htext.tag_add('no', '39.0', '39.2')  
+        htext.insert(END, '9. Trouble-shooting:\n\nIf there is a poor fit for the data, try decreasing the upper bound on the hyperparameter for the measurement error.\n\nIf the best-fit appears to change when you re-run the fitting, then the optimization is probably finding a local optimum. Try increasing the number of runs, say to 5.\n\nIf the inferred growth rate is too "noisy", try decreasing the upper bound on the hyperparameter for the flexibility.\n\n')
+        htext.tag_add('no', '39.0', '39.2')
+        htext.insert(END, '10. Acknowledgment:\n\nPS Swain, K Stevenson, A Leary, LF Montano-Gutierrez, IBN Clark, J Vogel, and T Pilizota. Inferring time derivatives including growth rates using Gaussian processes. Nat Commun 7 (2016) 13766')
+        htext.tag_add('no', '47.0', '47.3')
         htext.tag_config('no', foreground= 'OrangeRed4', font= ('helvetica', 25))
         htext.config(state= DISABLED)
 
-            
+
     def selectOpenFile(self, ifile= "", idir= "."):
         '''
         Load in data
@@ -156,21 +157,21 @@ class fitgui(Frame):
 
         # subframes
         tflt, tfr, tflb= self.tflt, self.tfr, self.tflb
-        
+
         # load data
         fname= askopenfilename(filetypes= (('Excel files', ('*.xls', '*.xlsx')),
                                            ('CSV files', '*.csv'),
                                            ('Text files', '*.txt'),
                                            ('Matlab files', '*.dat')),
-                                           initialdir= idir, initialfile= ifile)       
+                                           initialdir= idir, initialfile= ifile)
         if fname:
             self.direc= path.split(ifile)[0]
             ftype= fname.split('.')[-1]
             if ftype == 'txt' or ftype  == 'dat' or ftype == 'csv':
                 if ftype == 'csv':
-                    ld= np.genfromtxt(fname, delimiter=',')
+                    ld= pd.read_csv(fname).values
                 else:
-                    ld= np.genfromtxt(fname)
+                    ld= pd.read_table(fname).values
             elif ftype == 'xls' or ftype == 'xlsx':
                 ld= pd.ExcelFile(fname).parse(0).values
             else:
@@ -198,7 +199,7 @@ class fitgui(Frame):
                 widget.destroy()
             if hasattr(self, 'sepf'):
                 self.sepf.destroy()
-            
+
             # check buttons to choose replicates to analyze
             Label(tflt, text= 'Choose which replicates to fit',
                 bg= "lightsteelblue1", relief= SUNKEN).pack(side= TOP, fill= X, expand= YES)
@@ -215,10 +216,10 @@ class fitgui(Frame):
             # choose number of runs
             Label(tflb, text= 'No. of runs').pack(side= LEFT, anchor= W)
             self.ent0= Entry(tflb, width= 2)
-            self.ent0.insert(0, '1')
+            self.ent0.insert(0, '3')
             self.ent0.pack(side= LEFT, anchor= W, expand= YES)
-            
-            # choose number of samples        
+
+            # choose number of samples
             Label(tflb, text= 'No. of samples').pack(side= LEFT, anchor= W)
             self.ent1= Entry(tflb, width= 4)
             self.ent1.insert(0, '100')
@@ -235,7 +236,7 @@ class fitgui(Frame):
             Checkbutton(tflb, text= 'Non-uniform errors',
                         variable= self.errvar).pack(side= LEFT, anchor= W, expand= YES)
 
-            # choose hyperparameters     
+            # choose hyperparameters
             Label(tfr, text= 'Min and max of hyperparameters in log10',
                 bg= "lightsteelblue1", relief= SUNKEN).pack(side= TOP, fill= X, expand= YES)
             self.sbvars= []
@@ -258,23 +259,23 @@ class fitgui(Frame):
                     Scale(tempf, variable= var, from_= self.minh, to= self.maxh,
                         showvalue= YES).pack(side= LEFT, expand= YES)
                     self.sbvars.append(var)
-        
+
             # add separator
             self.sepf= Frame(self, height=2, bd=1, relief=SUNKEN)
             self.sepf.pack(side= TOP, fill=X, padx=5, pady=5)
 
-       
+
 
     def runfit(self):
         '''
         Call derivfit to fit the data and infer the time-derivative
         '''
-        
+
         t= self.t
 
         # get number of runs
         self.noruns= int(self.ent0.get())
-        
+
         # get number of samples
         self.nosamples= int(self.ent1.get())
 
@@ -296,7 +297,7 @@ class fitgui(Frame):
             esterrs= True
         else:
             esterrs= False
-        
+
         # get bounds for hyperparameters
         bns= [var.get() for var in self.sbvars]
         ubds= {}
@@ -306,7 +307,7 @@ class fitgui(Frame):
         # run fit
         print('\nStarting fit.')
         self.f= fitderiv(t, od, noruns= self.noruns, nosamples= self.nosamples, bd= ubds,
-                        logs= logs, esterrs= esterrs, gui= keep, exitearly= False,
+                        logs= logs, esterrs= esterrs, gui= keep,
                         statnames= ['max growth rate','time of max growth rate',
                                     'doubling time', 'max OD', 'lag time'])
         plt.figure()
@@ -315,7 +316,7 @@ class fitgui(Frame):
         plt.subplot(2,1,2)
         self.f.plotfit('df', ylabel= 'growth rate')
         plt.show(block= False)
-        
+
         # tidy up
         print('\nFinished fit.\n')
         root.lift()
@@ -338,7 +339,7 @@ class fitgui(Frame):
         else:
             showerror('Export Data', 'No fitting has been performed yet.')
 
-            
+
 ########
 
 

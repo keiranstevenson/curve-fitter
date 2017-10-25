@@ -1,26 +1,104 @@
 import gaussianprocess as gp
-import genutils as gu
 import matplotlib.pyplot as plt
 import numpy as np
 
+#####
+def findsmoothvariance(y, filtsig= 0.1, nopts= False):
+    '''
+    Estimates and then smooths the variance over replicates of data
+
+    Arguments
+    --
+    y: data - one column for each replicate
+    filtsig: sets the size of the Gaussian filter used to smooth the variance
+    nopts: if set, uses estimateerrorbar to estimate the variance
+    '''
+    from scipy.ndimage import filters
+    if y.ndim == 1:
+        # one dimensional data
+        v= estimateerrorbar(y, nopts)**2
+    else:
+        # multi-dimensional data
+        v= np.var(y, 1)
+    # apply Gaussian filter
+    vs= filters.gaussian_filter1d(v, int(len(y)*filtsig))
+    return vs
+
+######
+def mergedicts(original, update):
+    '''
+    Given two dicts, merge them into a new dict
+
+    Arguments
+    --
+    x: first dict
+    y: second dict
+    '''
+    z= original.copy()
+    z.update(update)
+    return z
+
+######
+def plotxyerr(x, y, xerr, yerr, xlabel= 'x', ylabel= 'y', title= '', color= 'b', figref= False):
+    '''
+    Plots a noisy x versus a noisy y with errorbars shown as ellipses.
+
+    Arguments
+    --
+    x: x variable (a 1D array)
+    y: y variable (a 1D array)
+    xerr: (symmetric) error in x (a 1D array)
+    yerr: (symmetric) error in y (a 1D array)
+    xlabel: label for x-axis
+    ylabel: label for y-axis
+    title: title of figure
+    color: default 'b'
+    figref: if specified, allows data to be added to an existing figure
+    '''
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Ellipse
+    if figref:
+        fig= figref
+    else:
+        fig= plt.figure()
+    ax= fig.add_subplot(111)
+    ax.plot(x, y, '.-', color= color)
+    for i in range(len(x)):
+        e= Ellipse(xy= (x[i], y[i]), width= 2*xerr[i], height= 2*yerr[i], alpha= 0.2)
+        ax.add_artist(e)
+        e.set_facecolor(color)
+        e.set_linewidth(0)
+    if not figref:
+        plt.xlim([np.min(x-2*xerr), np.max(x+2*xerr)])
+        plt.ylim([np.min(y-2*yerr), np.max(y+2*yerr)])
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.title(title)
+        plt.show(block= False)
+
+
+
+######
 
 
 class fitderiv:
     '''
+    Version 1.0
+
     to fit data and estimate the time derivative of the data using Gaussian processes
-    
+
     A typical work flow is:
 
     from fitderiv import fitderiv
     q= fitderiv(t, od, figs= True)
     q.plotfit('df')
 
-    or, for example, 
+    or, for example,
 
     plot(q.t, q.d, 'r.', q.t, q.y, 'b')
 
     Any replicate is fit separately, but the results are combined for predictions. The best-fit hyperparameters and their bounds are shown for each replicate.
-    
+
     The minimum and maximum limits of the hyperparameters can also be changed from their default values. For example,
 
     q= fitderiv(t, d, bd= {0: [-1, 4], 2: [2, 6]})
@@ -30,14 +108,14 @@ class fitderiv:
     Log data and results are stored as
         q.t : time (an input)
         q.origd : the original data (an input)
-        q.d : log of the data (unless logs= False) 
+        q.d : log of the data (unless logs= False)
         q.f : best-fit
         q.fvar : variance (error) in the best-fit
-        q.df : fitted first time-derivative 
+        q.df : fitted first time-derivative
         q.dfvar : variance (error) in the fitted first time-derivative
-        q.ddf : fitted second time-derivative 
+        q.ddf : fitted second time-derivative
         q.ddfvar : variance (error) in the fitted second time-derivative
-        
+
     Statistics are stored in a dictionary, q.ds, with keys:
         'max df' : max time derivative
         'time of max df' : time at which the max time derivative occurs
@@ -45,12 +123,20 @@ class fitderiv:
         'max f': the maximum value of the fitted curve
         'lag time' : lag time (when the tangent from the point of max time derivative crosses a line parallel to the x-axis and passing through the first data point)
     All statistics can be postfixed by ' var' to find the variance of the estimate.
+
+    Please cite
+
+    PS Swain, K Stevenson, A Leary, LF Montano-Gutierrez, IBN Clark, J Vogel, and T Pilizota.
+    Inferring time derivatives including growth rates using Gaussian processes
+    Nat Commun 7 (2016) 13766
+
+    to acknowledge the software.
     '''
-    
-    def __init__(self, t, d, cvfn= 'sqexp', noruns= 5, exitearly= True, figs= False, bd= False, 
+
+    def __init__(self, t, d, cvfn= 'sqexp', noruns= 3, exitearly= False, figs= False, bd= False,
                  esterrs= False, optmethod= 'l_bfgs_b', nosamples= 100, logs= True,
-                 gui= False, figtitle= False, ylabel= 'y', stats= True, statnames= False, 
-                 showstaterrors= True, warn= False):
+                 gui= False, figtitle= False, ylabel= 'y', stats= True, statnames= False,
+                 showstaterrors= True, warn= False, linalgmax= 3):
         '''
         Runs a Gaussian process to fit data and estimate the time-derivative
 
@@ -58,8 +144,8 @@ class fitderiv:
         --
         t: array of time points
         d: array of data with replicates in columns
-        cvfn: kernel function for the Gaussian process used in the fit - 'sqexp' (squared exponential: default), 'nn' (neural network: default)
-        noruns: number of fitting attempts made 
+        cvfn: kernel function for the Gaussian process used in the fit - 'sqexp' (squared exponential: default), 'matern' (Matern with nu= 5/2), or 'nn' (neural network)
+        noruns: number of fitting attempts made
         exitearly: if True, stop at the first successful fit; if False, take the best fit from all successful fits
         figs: plot the results of the fit
         bd: can be used to change the limits on the hyperparameters for the Gaussian process used in the fit
@@ -74,6 +160,7 @@ class fitderiv:
         statnames: a list for specializing the names of the statistics
         showstaterrors: if True, display estimated errors for statistics
         warn: if False, warnings created by covariance matrices that are not positive semi-definite are stopped
+        linalgmax: number of attempts (default is 3) if a linear algebra (numerical) error is generated
         '''
         self.ylabel= ylabel
         self.logs= logs
@@ -91,6 +178,7 @@ class fitderiv:
         # bounds for hyperparameters
         bnn= {0 : (-1,5), 1: (-7,-2), 2: (-6,2)}
         bsqexp= {0: (-5,5), 1: (-6,2), 2: (-5,2)}
+        bmatern= {0: (-5,5), 1: (-4,4), 2: (-5,2)}
         # take log of data
         self.origd= d
         if logs:
@@ -112,12 +200,12 @@ class fitderiv:
                         print('Equal numbers of data points are needed for empirically estimating errors.')
                     else:
                         # estimate errors empirically
-                        merrors= gu.findsmoothvariance(d)
+                        merrors= findsmoothvariance(d)
                         if figs:
                             plt.figure()
                             plt.errorbar(t, np.mean(d,1), np.sqrt(merrors))
                             plt.plot(t, d, '.')
-                            plt.show(block= False) 
+                            plt.show(block= False)
                 else:
                     print('Not enough replicates to estimate errors.')
             else:
@@ -131,7 +219,7 @@ class fitderiv:
         # display details of covariance functions
         try:
             if bd:
-                bds= gu.mergedicts(original= eval('b' + cvfn), update= bd)
+                bds= mergedicts(original= eval('b' + cvfn), update= bd)
             else:
                 bds= eval('b' + cvfn)
             if not gui:
@@ -141,7 +229,7 @@ class fitderiv:
         except NameError:
             print('Gaussian process not recognized.')
             from sys import exit
-            exit() 
+            exit()
         self.bds= bds
         # combine data into one array
         tb= np.tile(t, noreps)
@@ -157,7 +245,7 @@ class fitderiv:
             ma= False
         # run Gaussian process
         g= getattr(gp, cvfn + 'GP')(bds, ta, da, merrors= ma)
-        g.findhyperparameters(noruns, exitearly= exitearly, optmethod= optmethod)
+        g.findhyperparameters(noruns, exitearly= exitearly, optmethod= optmethod, linalgmax= linalgmax)
         # display results of fit
         if gui:
             print('log(max likelihood)= %e' % (-g.nlml_opt))
@@ -201,8 +289,8 @@ class fitderiv:
             else:
                 plt.title('mean fit +/- standard deviation')
             plt.show(block= False)
-        
-            
+
+
 
     def sample(self, nosamples, newt= False):
         '''
@@ -225,11 +313,11 @@ class fitderiv:
         noreps= self.noreps
         fghs= gps.sample(nosamples)
         f= fghs[:len(newt),:]
-        g= fghs[len(newt):2*len(newt),:]    
+        g= fghs[len(newt):2*len(newt),:]
         h= fghs[2*len(newt):,:]
         return f, g, h
-            
-        
+
+
     def plotfit(self, char= 'f', errorfac= 1, xlabel= 'time', ylabel= False, figtitle= False):
         '''
         Plots the results of the fit.
@@ -253,10 +341,10 @@ class fitderiv:
             plt.ylabel(char)
         plt.xlabel(xlabel)
         if figtitle: plt.title(figtitle)
-        
-        
 
-            
+
+
+
     def calculatestats(self, nosamples= 100, statnames= False, showerrors= True):
         '''
         Calculates statistics from best-fit curve and its inferred time derivative - 'max df', 'time of max df', 'inverse max grad', 'max f', 'lag time'.
@@ -295,7 +383,7 @@ class fitderiv:
         self.printstats(showerrors= showerrors)
 
 
-        
+
     def printstats(self, errorfac= 1, showerrors= True, performprint= True):
         '''
         Creates and prints a dictionary of the statistics of the data and its inferred time-derivative
@@ -321,7 +409,7 @@ class fitderiv:
         return statd
 
 
-            
+
     def plotstats(self):
         '''
         Produces a bar chart of the statistics.
@@ -357,15 +445,15 @@ class fitderiv:
         else:
             xlabel= 'fitted ' + ylabel
         ylabel= 'deriv ' + ylabel
-        gu.plotxyerr(self.f, self.df, np.sqrt(self.fvar), np.sqrt(self.dfvar), xlabel, ylabel, title)
-        
-        
-        
+        plotxyerr(self.f, self.df, np.sqrt(self.fvar), np.sqrt(self.dfvar), xlabel, ylabel, title)
+
+
+
 
     def export(self, fname, rows= False):
         '''
         Exports the fit and inferred time-derivative to a text or Excel file.
-        
+
         Arguments
         --
         fname: name of the file (.csv files are recognized)
@@ -402,13 +490,9 @@ class fitderiv:
                 df.to_excel(fname, sheet_name= 'Sheet1', index= False)
             dfs.to_excel(fname.split('.')[0] + '_stats.xlsx', sheet_name= 'Sheet1', index= False)
         else:
-            print('!!!!! File type is not recognized. No data has been saved. !!!!!')
+            print('!! File type is either not recognized or not specified. Cannot save as', fname)
 
 
 #####
 
 if __name__ == '__main__': print(fitderiv.__doc__)
-
-
-
-
