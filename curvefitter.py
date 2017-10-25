@@ -18,16 +18,17 @@ import pandas as pd
 from fitderiv import fitderiv
 
 
-def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelcols=3, replicols=3,
-                waterwells=False, replicates=False, repignore=None, normalise=0.05, growthmin=0.05, alignvalue=0.1,
+def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelcols=3, replicol=3,
+                waterwells=False, replicates=False, repignore=None,
+                normalise=0.05, normby=(4,14), growthmin=0.05, alignvalue=0.1,
                 fitparams={0: [-5, 8], 1: [-6, -1], 2: [-5, 2]}, noruns=5, nosamples=20, logdata=True,
                 makeplots=True, showplots=False):
     '''
     filename: filename or folder location (only if replicates==1)
-    predefinedinput: 'BMG' sets skiprows, labelcols, replicols and repignore based on standard format for BMG platereader files
+    predefinedinput: 'BMG' sets skiprows, labelcols, replicol and repignore based on standard format for BMG platereader files
     skiprows; lines of input file to skip before retrieving data. First row assumed as time with data following immediately below
     labelcols; first n columns are labels/text and are used to populate the output
-    replicols; column containing the strings used to match replicates
+    replicol; column containing the strings used to match replicates
     waterwells; ignores wells on the outside of 96 well plate
     replicates; indicates presense of replicates to be used for data sorting automatically runs normalise and align on replicates to ensure most accurate GR
     repignore; regex string that defines replicates to be ignored ie 'Sample *' for BMG files
@@ -44,34 +45,21 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     if predefinedinput == 'BMG':  # For BMG output from TP lab reader
         skiprows = 6
         labelcols = 3
-        replicols = 3
+        replicol = 2
         repignore = 'Sample X*'
 
-    replicols = replicols - 1  # converts to index from number
+    #replicol = replicol - 1  # converts to index from number
 
     # Process files before inputting
     filename = os.path.realpath(filename)
-    if os.path.isdir(filename):
-        files = glob(os.path.join(filename, '*.[cC][sS][vV]')) + glob(os.path.join(filename, '*.[xX][lL][sS][xX]'))
-        print('++++++++++Detected folder. Processing ' + str(len(files)) + ' files++++++++++')
-        for i in range(0, len(files)):
-            filename = files[i]
-            print('++++++++++ Processing file ++++++++++')
-            print(filename)
-            # Yay recursion
-            curvefitter(filename, header, predefinedinput, skiprows, labelcols, replicols,
-                        waterwells, replicates, repignore, normalise, growthmin, alignvalue,
-                        fitparams, noruns, nosamples, logdata,
-                        makeplots, showplots)
-        return
 
-    elif replicates & os.path.isdir(filename) == True:
+    if replicates & os.path.isdir(filename) is True:
         infile = multifilerepimport(filename, header, skiprows, labelcols, waterwells)
         filepath = os.path.join(filename, 'curvefitter' + ' outputdata')
         filename = os.path.split(filename)[-1]
-        infile = cleannonreps(infile, replicols, repignore)
+        infile = cleannonreps(infile, replicol, repignore)
 
-        reps = infile.iloc[1:, replicols]
+        reps = infile.iloc[1:, replicol]
         uniquereps = np.unique(reps)
 
         # Provide info about datashape for interation to use
@@ -79,25 +67,41 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         datalength = infile.shape[1]
         firstline = infile.iloc[0]
 
-        print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
+        print('++++++++++ Found {} replicates ++++++++++'.format(dataheight))
         for x in uniquereps: print(x)
         sys.stdout.flush()
 
-    elif replicates & os.path.isfile(filename):
+    elif os.path.isdir(filename) is True:
+        files = glob(os.path.join(filename, '*.[cC][sS][vV]')) + glob(os.path.join(filename, '*.[xX][lL][sS][xX]'))
+        print('++++++++++Detected folder. Processing {} files++++++++++'.format(len(files)))
+        for i in range(0, len(files)):
+            filename = files[i]
+            print('++++++++++ Processing file ++++++++++')
+            print(filename)
+            # Yay recursion
+            curvefitter(filename, header, predefinedinput, skiprows, labelcols, replicol,
+                        waterwells, replicates, repignore, normalise, normby, growthmin, alignvalue,
+                        fitparams, noruns, nosamples, logdata,
+                        makeplots, showplots)
+        return
+
+    elif replicates & os.path.isfile(filename) is True:
         try:
             infile = pd.read_csv(filename, header=header, skiprows=skiprows)
         except pd.parser.CParserError:
             infile = pd.read_excel(filename, header=header, skiprows=skiprows)
+        except pd.parser.ParserError:
+            infile = pd.read_excel(filename, header=header, skiprows=skiprows)
 
-        infile = cleannonreps(infile, replicols, repignore)
-        reps = infile.iloc[1:, replicols]
+        infile = cleannonreps(infile, replicol, repignore)
+        reps = infile.iloc[1:, replicol]
         uniquereps = np.unique(reps)
 
         dataheight = uniquereps.shape[0]
         datalength = infile.shape[1]
         firstline = infile.iloc[0]
 
-        print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
+        print('++++++++++ Found {} replicates ++++++++++'.format(dataheight))
         for x in uniquereps: print(x)
         sys.stdout.flush()
 
@@ -106,10 +110,12 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         filename = filename.split('.')[-2]
         filepath = os.path.join(filepath, 'curvefitter' + ' outputdata')
 
-    elif os.path.isfile(filename):
+    elif os.path.isfile(filename) is True:
         try:
             infile = pd.read_csv(filename, header=header, skiprows=skiprows)
         except pd.parser.CParserError:
+            infile = pd.read_excel(filename, header=header, skiprows=skiprows)
+        except pd.parser.ParserError:
             infile = pd.read_excel(filename, header=header, skiprows=skiprows)
 
         filepath = os.path.split(filename)[0]
@@ -146,6 +152,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         print(
             '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \nTime does not always increase along its length \n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         print('Estimating missing values')
+        print('Assuming time intervals are evenly spaced')
         timegradient = np.diff(time)
         meanstep = np.mean(timegradient)
 
@@ -154,23 +161,24 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 time[i + 1] = time[i] + meanstep
 
     # sanity check data
+    timecheck = np.logical_not(np.isnan(time))
     for i in range(1, infile.shape[0]):
         data = np.float64(infile.iloc[i, labelcols:].copy())
         datacheck = data[np.logical_not(np.isnan(data))]
         if len(datacheck) > len(timecheck):
             raise RuntimeError('Error data is longer than time')
-        data = normalisetraces(data, normvalue=normalise)
+        data = normalisetraces(datacheck, normvalue=normalise,normby=normby)
         if any(data <= 0):
             raise ArithmeticError(
-                'Error normalise value gives value <=0. Log function failed, please choose a larger value')
+                'Error normalise value gives value <=0. \nLog function failed, please choose a larger normalise value')
 
     try:
         for i in range(1, dataheight + 1):
             if replicates:
-                location = '++++++++++ Processing replicate set ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
+                location = '++++++++++ Processing replicate set {:03} of {:03} ++++++++++'.format(i, dataheight)
                 print(location)
                 repset = uniquereps[i - 1]
-                repselection = repset == infile.iloc[:, replicols]
+                repselection = repset == infile.iloc[:, replicol]
                 od = infile.loc[repselection]
 
                 # Defines names for results
@@ -181,10 +189,10 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
                 # Converts columns to float format for fitderiv
                 odfloat = np.array(od, dtype='float64')
-                odfloat = normalisetraces(odfloat, normalise)
+                odfloat = normalisetraces(odfloat, normvalue=normalise,normby=normby)
                 odfloat = alignreplicates(odfloat, normalise, alignvalue)
                 noofreps = odfloat.shape[0]
-                repinfo2 = 'Found ' + str(noofreps) + ' replicates'
+                repinfo2 = 'Found {} replicates'.format(noofreps)
                 print(repinfo2)
 
                 # Removes NaNs from analysis
@@ -196,7 +204,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 odfloat = odfloat[:, :ii]
                 t = time[:ii]
             else:
-                location = '++++++++++ Processing row ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
+                location = '++++++++++ Processing row {:03} of {:03} ++++++++++'.format(i, dataheight)
                 print(location)
                 od = infile.iloc[i]
                 od = od[labelcols + 1:]
@@ -208,7 +216,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
                 # Converts columns to float format for fitderiv
                 odfloat = np.array(od, dtype='float64')
-                odfloat = normalisetraces(odfloat, normalise)
+                odfloat = normalisetraces(odfloat, normalise, normby=normby)
 
                 # Removes NaNs from analysis
                 nantest = np.isnan(odfloat)
@@ -441,18 +449,18 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols, waterwells):
     return stackfile
 
 
-def normalisetraces(dataset, normvalue=0.05):
+def normalisetraces(dataset, normvalue=0.05, normby=(4,14)):
     # Normalises line by line on points 5:15
     try:
         x = dataset.shape[1]
         for i in range(0, dataset.shape[0]):
-            zeroingvalue = np.mean(dataset[i, 4:14])
+            zeroingvalue = np.mean(dataset[i, normby[0]:normby[1]])
             zeroingvalue = normvalue - zeroingvalue
             dataset[i, :] = dataset[i, :] + zeroingvalue
 
         return dataset
     except IndexError:
-        zeroingvalue = np.mean(dataset[4:14])
+        zeroingvalue = np.mean(dataset[normby[0]:normby[1]])
         zeroingvalue = normvalue - zeroingvalue
         dataset = dataset + zeroingvalue
         return dataset

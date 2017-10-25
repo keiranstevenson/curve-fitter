@@ -12,21 +12,22 @@ The original fitting algorithm is provided in this package as well and can be ru
 Scipy
 
 # How to use curve-fitter
-curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, labelcols= 3, replicols= 3, waterwells= False, replicates= False, repignore= None, normalise= 0.05, growthmin= 0.05, alignvalue= 0.1, fitparams= {0:[-5,8], 1:[-6,-1], 2:[-5,2]}, noruns= 5, nosamples= 20, makeplots = True, showplots= True):
+curvefitter(filename,header= None, predefinedinput= None, skiprows= 0, labelcols= 3, replicol= 3, waterwells= False, replicates= False, repignore= None, normalise= 0.05, growthmin= 0.05, alignvalue= 0.1, fitparams= {0:[-5,8], 1:[-6,-1], 2:[-5,2]}, noruns= 5, nosamples= 20, makeplots = True, showplots= True):
 
 ### Parameters
 
 |Parameter|Definition|Type|Default|
 |---|---|---|---|
 filename |Filename or folder location (only if replicates==1)|string| N/A
-predefinedinput|'BMG' sets skiprows, labelcols, replicols and repignore based on standard format for BMG platereader files|string or None|None
+predefinedinput|'BMG' sets skiprows, labelcols, replicol and repignore based on standard format for BMG platereader files|string or None|None
 skiprows| Lines of input file to skip before retrieving data. First row assumed as time with data following immediately below| Integer| 0
 labelcols| First n columns of labels/text that are used to populate the output| integer| 3
-replicols| Column containing the values or strings used to match replicates. Rows with an exact match (including whitespace if string) in this column will be fitted together as replicates| integer| 3
+replicol| Index of column containing the values or strings used to match replicates. Rows with an exact match (including whitespace if string) in this column will be fitted together as replicates| integer| 3
 waterwells| Ignores wells on the outside of a 96 well plate. Columns 1 & 12, rows A & H.| boolean| False
 replicates| Indicates presence of replicates to be used for data sorting. This automatically runs normalise and align on replicates to ensure most accurate GR. | boolean| False
 repignore| Regex formatted string that defines replicates to be ignored ie 'Sample *' for BMG files|regex string| None
 normalise| Value that data is normalised to before fitting. Data is normalised such that the mean value of points 5-15 is equal to normalise. DO NOT USE 0(zero) or log function will fail|float| 0.05
+normby| Touple of two values that define the range that is normalised to normalise value|touple of ints|(4,14)
 growthmin| Minimum value required for growth to be counted and fitted. Growth is determined as anywhere 3 consecutive points are greater than growthmin+minimum value for the curve. Fitting purely flat functions consumes time for fitting and produces unreliable results| float| 0.05
 alignvalue| Aligns replicates so that this value is reached at the same time for all reps, if alignvalue=None then it is skipped. Alingment point is determined as i where i, i+1 and i+2 are greater than alignvalue+normalise. Where i is ifferent for each replicate, the start of the data is removed until all i's are equal to the minimum i found.| float or None| 0.1
 fitparams| Fit parameters used by the Swain software. Narrower parameters, fine tuned to your data are recommended for faster fitting| dictionary list of three value pairs|{0:[-5,8], 1:[-6,-1], 2:[-5,2]}
@@ -43,38 +44,18 @@ The settings that you obtain can then be fed into the curve-fitter program to be
 ### Input file format
 Files should either be a csv or xlsx with the data in a row oriented format. The first line read by the program is taken as the time input.
 
-#### example input
-For the table below:
+#### example of input values
+<img src=".\Images\Slide1.PNG" width="600" height="500"/>
 
-|rowno\columnno|1|2|3|4|5|...|
-|---|---|---|---|---|---|---|
-1|Row|Column|Name|read1|read2
-2|Row|Column|Name|0|0.1
-3|A|1|Control|0.1|0.2
-4|A|2|Cond1|0.1|0.2
-5|A|2|Cond1|0.1|0.2
-...|
+![](.\Images\Slide2.PNG =500x)
 
-```Python
-from curvefitter import curvefitter
+![](.\Images\Slide3.PNG)
 
-curvefitter('Example.xlsx', skiprows=1, labelcols=3, replicols=3, replicates=True)
-```
-Row 4 and 5 will be fitted together as replicates, row 3 will be fitted on its own. Graphs will be displayed with each fitting and saved to the output folder.
-```
-Output structure:
-\datalocation\
-            inputfile.xlsx
-             \curvefitter outputdata\
-                                    inputfile Analysed
-                                    inputfile 2 Analysed
-                                    \inputfile plots\
-                                                    Control.png
-                                                    Cond1.png
-                                    \inputfile 2 plots\
-                                                    Control.png
-                                                    Cond1.png  
-```
+![](.\Images\Slide4.PNG)
+
+Final ouptu
+![](.\Images\Slide5.PNG)
+
 Further examples of program calls and files are present in the examplefileimport.py script and examples folder.
 # References
 The original fitting routine can be found here: http://swainlab.bio.ed.ac.uk/software/fitderiv/

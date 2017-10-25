@@ -11,18 +11,24 @@ from curvefitter import curvefitter as cfit
 # filename = 'Datafiles/multireptest/'
 # cfit(filename, predefinedinput= 'BMG', replicates=True, waterwells=True, noruns=1, nosamples=4)
 
-filename = 'Datafiles/Shorttest.CSV'
-cfit(filename, labelcols=3, replicols=3, skiprows=6, waterwells=True, normalise=0.1, noruns=1, nosamples=4)
+# filename = 'Datafiles/Shorttest.CSV'
+# cfit(filename, labelcols=3, replicols=2, skiprows=6, waterwells=True, normalise=0.1, noruns=1, nosamples=4,showplots=True)
 
-filename = 'Datafiles/Singlereplicate ex.csv'
-cfit(filename, predefinedinput='BMG', waterwells=True, normalise=0.1, noruns=1, nosamples=4, showplots=False,
-     replicates=True)
+# filename = 'Datafiles/Singlereplicate ex.csv'
+# cfit(filename, predefinedinput='BMG', waterwells=True, normalise=0.1, noruns=1, nosamples=4, showplots=False,
+#      replicates=True)
+#
+# filename = 'Datafiles/Difformat/Tecanstyle.xlsx'
+# cfit(filename, showplots=False, skiprows=63, labelcols=1, growthmin=0.101,
+#      fitparams={0: [-3, 8], 1: [-6, 2], 2: [-5, 2]})
+#
+# filename = 'Datafiles/'
+# cfit(filename, predefinedinput='BMG', waterwells=True, showplots=False, normby=(5,6))
 
-filename = 'Datafiles/Difformat/Tecanstyle.xlsx'
-cfit(filename, showplots=False, skiprows=63, labelcols=1, growthmin=0.101,
-     fitparams={0: [-3, 8], 1: [-6, 2], 2: [-5, 2]})
+# filename = 'Datafiles/Demoexample.csv'
+# cfit(filename, predefinedinput='BMG', normby=(1,2),replicates=True)
 
-filename = 'Datafiles/'
-cfit(filename, predefinedinput='BMG', waterwells=True, showplots=False)
-
+filename ='testdata2.csv'
+cfit(filename,skiprows=1,normalise=0.1,normby=(1,5),labelcols=1)
 print('YAY! No errors!')
+
