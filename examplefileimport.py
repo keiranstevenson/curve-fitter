@@ -9,26 +9,22 @@ from curvefitter import curvefitter as cfit
 
 ## This test takes a while due to high number of replicates
 # filename = 'Datafiles/multireptest/'
-# cfit(filename, predefinedinput= 'BMG', replicates=True, waterwells=True, noruns=1, nosamples=4)
+
+# cfit(filename, predefinedinput= 'BMG', replicatesexist=True, noruns=1, nosamples=4)
 
 # filename = 'Datafiles/Shorttest.CSV'
-# cfit(filename, labelcols=3, replicols=2, skiprows=6, waterwells=True, normalise=0.1, noruns=1, nosamples=4,showplots=True)
-
+# cfit(filename, labelcolumns=3, replicatecolumn=3, skiprows=6, normalise=0.1, noruns=1, nosamples=4)
+#
 # filename = 'Datafiles/Singlereplicate ex.csv'
-# cfit(filename, predefinedinput='BMG', waterwells=True, normalise=0.1, noruns=1, nosamples=4, showplots=False,
-#      replicates=True)
+# cfit(filename, predefinedinput='BMG', normalise=0.1, noruns=1, nosamples=4, showplots=False,
+#      replicatesexist=True)
 #
 # filename = 'Datafiles/Difformat/Tecanstyle.xlsx'
-# cfit(filename, showplots=False, skiprows=63, labelcols=1, growthmin=0.101,
+# cfit(filename, showplots=False, skiprows=63, labelcolumns=1, growthmin=0.101, normalise=0.2,
 #      fitparams={0: [-3, 8], 1: [-6, 2], 2: [-5, 2]})
-#
-# filename = 'Datafiles/'
-# cfit(filename, predefinedinput='BMG', waterwells=True, showplots=False, normby=(5,6))
 
-# filename = 'Datafiles/Demoexample.csv'
-# cfit(filename, predefinedinput='BMG', normby=(1,2),replicates=True)
+filename = 'Datafiles/'
+cfit(filename, predefinedinput='BMG', showplots=False)
 
-filename ='testdata2.csv'
-cfit(filename,skiprows=1,normalise=0.1,normby=(1,5),labelcols=1)
 print('YAY! No errors!')
 
