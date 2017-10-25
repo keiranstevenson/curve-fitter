@@ -480,7 +480,7 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols):
 
 
 
-def normalisetraces(dataset, normvalue=0.05, normby=(4,14)):
+def normalise_traces(dataset, normvalue=0.05, normby=(4,14)):
     # Normalises line by line on points 5:15
     try:
         x = dataset.shape[1]

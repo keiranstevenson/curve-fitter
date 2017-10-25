@@ -12,8 +12,8 @@ from curvefitter import curvefitter as cfit
 
 # cfit(filename, predefinedinput= 'BMG', replicatesexist=True, noruns=1, nosamples=4)
 
-# filename = 'Datafiles/Shorttest.CSV'
-# cfit(filename, labelcolumns=3, replicatecolumn=3, skiprows=6, normalise=0.1, noruns=1, nosamples=4)
+filename = 'Datafiles/Shorttest.CSV'
+cfit(filename, labelcolumns=3, replicatecolumn=3, skiprows=6, normalise=0.1, noruns=1, nosamples=4)
 #
 # filename = 'Datafiles/Singlereplicate ex.csv'
 # cfit(filename, predefinedinput='BMG', normalise=0.1, noruns=1, nosamples=4, showplots=False,
@@ -23,8 +23,10 @@ from curvefitter import curvefitter as cfit
 # cfit(filename, showplots=False, skiprows=63, labelcolumns=1, growthmin=0.101, normalise=0.2,
 #      fitparams={0: [-3, 8], 1: [-6, 2], 2: [-5, 2]})
 
-filename = 'Datafiles/'
-cfit(filename, predefinedinput='BMG', showplots=False)
+# filename = 'Datafiles/'
+# cfit(filename, predefinedinput='BMG', showplots=False,normalise=1)
+
 
 print('YAY! No errors!')
+
 
