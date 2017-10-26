@@ -179,17 +179,22 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 od_float = normalise_traces(od_float, normalise)
                 od_float = align_replicates(od_float, normalise, alignvalue)
                 noofreps = od_float.shape[0]
-                replicate_info2 = 'Found ' + str(noofreps) + ' replicates'
+                replicate_info2 = 'Found {} replicates'.format(noofreps)
                 print(replicate_info2)
 
                 # Removes NaNs from analysis
-                nantest = np.isnan(od_float)
-                for ii in range(0, nantest.shape[1]):
-                    if any(nantest[:, ii]):
-                        x = ii - 1
-                        break
-                od_float = od_float[:, :ii]
-                t = time[:ii]
+                try:
+                    nantest = np.isnan(od_float)
+                    for ii in range(0, nantest.shape[1]):
+                        if any(nantest[:, ii]):
+                            x = ii - 1
+                            break
+                    od_float = od_float[:, :ii]
+                    t = time[:ii]
+                except IndexError:
+                    t = time
+                    od_float = odfloat[:, len(time)-1]
+
                 if noofreps == 0:
                     growthfound = False
                 else:
@@ -210,13 +215,17 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 od_float = normalise_traces(od_float, normalise)
 
                 # Removes NaNs from analysis
-                nantest = np.isnan(od_float)
-                for ii in range(0, len(nantest)):
-                    if nantest[ii]:
-                        x = ii - 1
-                        break
-                od_float = od_float[:ii]
-                t = time[:ii]
+                try:
+                    nantest = np.isnan(od_float)
+                    for ii in range(0, len(nantest)):
+                        if nantest[ii]:
+                            x = ii - 1
+                            break
+                    od_float = od_float[:ii]
+                    t = time[:ii]
+                except IndexError:
+                    t = time
+                    od_float = odfloat[len(time)-1]
 
                 # Check for growth
                 growthfound = check_for_growth(od_float, growthmin, normalise)
@@ -385,7 +394,8 @@ def sanitychecks(infile, labelcolumns, normalise, time):
         data = np.float64(infile.iloc[i, labelcolumns:].copy())
         data = data[np.logical_not(np.isnan(data))]
         if len(data) > len(timecheck):
-            raise RuntimeError('Error data is longer than time')
+            print('ERROR in line {} \n Data is longer than time, truncating data'.format(i))
+            #raise RuntimeError('Error data is longer than time')
         if len(data) > 0:
             data = normalise_traces(data, normvalue=normalise)
             if any(data <= 0):
