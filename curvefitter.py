@@ -20,9 +20,9 @@ from fitderiv import fitderiv
 
 def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelcolumns=3, replicatecolumn=3,
                 replicatesexist=False, replicateignore=None, 
-                normalise=0, normby=(4,14), growthmin=0.05, alignvalue=0.1,
+                growthmin=0.05, alignvalue=0.1,
                 fitparams={0: [-5, 8], 1: [-6, -1], 2: [-5, 2]}, noruns=5, nosamples=20, logdata=True,
-                makeplots=True, showplots=False, startnormalise=1):
+                makeplots=True, showplots=False):
     '''
     filename: filename or folder location (only if replicatesexist==1)
     predefinedinput: 'BMG' sets skiprows, labelcolumns, replicatecolumn and replicateignore based on standard format for BMG platereader files
@@ -34,7 +34,6 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     replicatesexist; indicates presence of replicatesexist to be used for data sorting automatically runs normalise and align on replicatesexist to ensure most accurate GR
     replicateignore; regex string that defines replicatesexist to be ignored ie 'Sample
      ' for BMG files
-    normalise; value that data is normalised to at the start DO NOT USE 0 or log function will fail
     growthmin; minimum value required for growth to be counted and fitted, fitting purely flat functions consumes time for fitting and produces unreliable results
     alignvalue; aligns replicatesexist so that this value is reached at the same time for all reps
     fitparams; fitparameters used by the deODoriser
@@ -53,11 +52,9 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
         skiprows = 63
         labelcolumns = 1
 
-    if normalise != 0:
-        print('WARNING: ALL DATA WILL BE NORMALISED TO ZERO')
+    normalise = 10**(-2)
     waterwells = False  # no longer necessary but left
     replicatecolumn = replicatecolumn - 1  # converts to index from number
-    startnormalise = startnormalise - 1
 
     # Process files before inputting
     filename = os.path.realpath(filename)
@@ -92,7 +89,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
             # Yay recursion
             curvefitter(filename=filename, header=header, predefinedinput=predefinedinput, skiprows=skiprows,
                         labelcolumns=labelcolumns, replicatecolumn=replicatecolumn + 1, replicatesexist=replicatesexist,
-                        replicateignore=replicateignore, normalise=normalise, growthmin=growthmin,
+                        replicateignore=replicateignore, growthmin=growthmin,
                         alignvalue=alignvalue, fitparams=fitparams, noruns=noruns, nosamples=nosamples, logdata=logdata,
                         makeplots=makeplots, showplots=showplots)
         return
@@ -160,7 +157,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     time = np.float64(time)
 
 
-    sanitychecks(infile, labelcolumns, normalise, normby, time)
+    sanitychecks(infile, labelcolumns, normalise, time)
 
     try:
         for i in range(1, dataheight + 1):
@@ -179,7 +176,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
                 # Converts columns to float format for fitderiv
                 od_float = np.array(od, dtype='float64')
-                od_float = normalise_traces(od_float, normalise, normby)
+                od_float = normalise_traces(od_float, normalise)
                 od_float = align_replicates(od_float, normalise, alignvalue)
                 noofreps = od_float.shape[0]
                 replicate_info2 = 'Found ' + str(noofreps) + ' replicates'
@@ -210,7 +207,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
                 # Converts columns to float format for fitderiv
                 od_float = np.array(od, dtype='float64')
-                od_float = normalise_traces(od_float, normalise, normby)
+                od_float = normalise_traces(od_float, normalise)
 
                 # Removes NaNs from analysis
                 nantest = np.isnan(od_float)
@@ -368,7 +365,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     return
 
 
-def sanitychecks(infile, labelcolumns, normalise, normby, time):
+def sanitychecks(infile, labelcolumns, normalise, time):
     # sanity check time
     timecheck = time[np.logical_not(np.isnan(time))]
     timecheck = np.gradient(timecheck)
@@ -390,7 +387,7 @@ def sanitychecks(infile, labelcolumns, normalise, normby, time):
         if len(data) > len(timecheck):
             raise RuntimeError('Error data is longer than time')
         if len(data) > 0:
-            data = normalise_traces(data, normvalue=normalise, normby=normby)
+            data = normalise_traces(data, normvalue=normalise)
             if any(data <= 0):
                 raise ArithmeticError(
                     'Error normalise value gives value <=0. Log function failed, please choose a larger value')
@@ -481,21 +478,19 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols):
 
         return stackfile
 
-
-
-def normalise_traces(dataset, normvalue=0, normby=(4,14)):
+def normalise_traces(dataset, normvalue=0.01):
     # Normalises line by line on points 5:15
-    normvalue = 10**(-2)
+    #normvalue = 10**(-2)
     try:
         x = dataset.shape[1]
         for i in range(0, dataset.shape[0]):
-            zeroingvalue = np.min(dataset[i,:])
+            zeroingvalue = np.nanmin(dataset[i,:])
             zeroingvalue = normvalue - zeroingvalue
             dataset[i, :] = dataset[i, :] + zeroingvalue
         return dataset
     # For single rows
     except IndexError:
-        zeroingvalue = np.min(dataset[:])
+        zeroingvalue = np.nanmin(dataset[:])
         zeroingvalue = normvalue - zeroingvalue
         dataset = dataset + zeroingvalue
         return dataset
