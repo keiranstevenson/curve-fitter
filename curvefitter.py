@@ -18,102 +18,102 @@ import pandas as pd
 from fitderiv import fitderiv
 
 
-def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelcolumns=3, replicatecolumn=3,
-                replicatesexist=False, replicateignore=None, 
-                growthmin=0.05, alignvalue=0.1,
-                fitparams={0: [-5, 8], 1: [-6, -1], 2: [-5, 2]}, noruns=5, nosamples=20, logdata=True,
-                makeplots=True, showplots=False):
+def curvefitter(filename, header=None, predefined_input=None, skip_rows=0, label_columns=3, replicate_column=3,
+                replicates_exist=False, replicate_ignore=None,
+                growth_minimum=0.05, alignment_value=0.1,
+                fiting_parameters={0: [-5, 8], 1: [-6, -1], 2: [-5, 2]}, no_runs=5, no_samples=20, logdata=True,
+                make_plots=True, show_plots=False):
     '''
-    filename: filename or folder location (only if replicatesexist==1)
-    predefinedinput: 'BMG' sets skiprows, labelcolumns, replicatecolumn and replicateignore based on standard format for BMG platereader files
-    skiprows; lines of input file to skip before retrieving data. First row assumed as time with data following immediately below
-    labelcolumns; first n columns are labels/text and are used to populate the output
-    replicatecolumn; column containing the strings used to match replicatesexist
+    filename: filename or folder location (only if replicates_exist==1)
+    predefined_input: 'BMG' sets skip_rows, label_columns, replicate_column and replicate_ignore based on standard format for BMG platereader files
+    skip_rows; lines of input file to skip before retrieving data. First row assumed as time with data following immediately below
+    label_columns; first n columns are labels/text and are used to populate the output
+    replicate_column; column containing the strings used to match replicates_exist
 
     waterwells; ignores wells on the outside of 96 well plate
-    replicatesexist; indicates presence of replicatesexist to be used for data sorting automatically runs normalise and align on replicatesexist to ensure most accurate GR
-    replicateignore; regex string that defines replicatesexist to be ignored ie 'Sample
+    replicates_exist; indicates presence of replicates_exist to be used for data sorting automatically runs normalise and align on replicates_exist to ensure most accurate GR
+    replicate_ignore; regex string that defines replicates_exist to be ignored ie 'Sample
      ' for BMG files
-    growthmin; minimum value required for growth to be counted and fitted, fitting purely flat functions consumes time for fitting and produces unreliable results
-    alignvalue; aligns replicatesexist so that this value is reached at the same time for all reps
-    fitparams; fitparameters used by the deODoriser
-    noruns; number of fitting attempts made
-    nosamples; number of samples used to calculate error
-    makeplots; determines if program makes plots and saves to output folder
-    showplots; displays plots during processing
+    growth_minimum; minimum value required for growth to be counted and fitted, fitting purely flat functions consumes time for fitting and produces unreliable results
+    alignment_value; aligns replicates_exist so that this value is reached at the same time for all reps
+    fiting_parameters; fitparameters used by the deODouriser
+    no_runs; number of fitting attempts made
+    no_samples; number of samples used to calculate error
+    make_plots; determines if program makes plots and saves to output folder
+    show_plots; displays plots during processing
     '''
 
-    if predefinedinput == 'BMG':  # For BMG output from TP lab reader
-        skiprows = 6
-        labelcolumns = 3
-        replicatecolumn = 3
-        replicateignore = 'Sample X*'
-    elif predefinedinput == 'Tecan':
-        skiprows = 63
-        labelcolumns = 1
+    if predefined_input == 'BMG':  # For BMG output from TP lab reader
+        skip_rows = 6
+        label_columns = 3
+        replicate_column = 3
+        replicate_ignore = 'Sample X*'
+    elif predefined_input == 'Tecan':
+        skip_rows = 63
+        label_columns = 1
 
     normalise = 10**(-2)
     waterwells = False  # no longer necessary but left
-    replicatecolumn = replicatecolumn - 1  # converts to index from number
+    replicate_column = replicate_column - 1  # converts to index from number
 
     # Process files before inputting
     filename = os.path.realpath(filename)
-    if replicatesexist & os.path.isdir(filename) is True:
-        infile = multifilerepimport(filename, header, skiprows, labelcolumns)
+    if replicates_exist & os.path.isdir(filename) is True:
+        infile = multifilerepimport(filename, header, skip_rows, label_columns)
         filepath = os.path.join(filename, 'curvefitter' + ' outputdata')
         filename = os.path.split(filename)[-1]
-        infile = cleannonreps(infile, replicatecolumn, replicateignore)
+        infile = cleannonreps(infile, replicate_column, replicate_ignore)
 
-        reps = infile.iloc[1:, replicatecolumn]
+        reps = infile.iloc[1:, replicate_column]
         unique_replicates = np.unique(reps)
 
 
         # Provide info about datashape for interation to use
         dataheight = unique_replicates.shape[0]
         datalength = infile.shape[1]
-        firstline = infile.iloc[0, labelcolumns - 1:].copy()
+        firstline = infile.iloc[0, label_columns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
 
 
-        print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
+        print('++++++++++ Found {} replicates ++++++++++'.format(dataheight))
         for x in unique_replicates: print(x)
         sys.stdout.flush()
 
     elif os.path.isdir(filename):
         files = glob(os.path.join(filename, '*.[cC][sS][vV]')) + glob(os.path.join(filename, '*.[xX][lL][sS][xX]'))
-        print('++++++++++Detected folder. Processing ' + str(len(files)) + ' files++++++++++')
+        print('++++++++++Detected folder. Processing {} files++++++++++'.format(len(files)))
         for i in range(0, len(files)):
             filename = files[i]
-            print('++++++++++ Processing file ' + filename + '++++++++++')
+            print('++++++++++ Processing file {} ++++++++++'.format(filename))
             print(filename)
             # Yay recursion
-            curvefitter(filename=filename, header=header, predefinedinput=predefinedinput, skiprows=skiprows,
-                        labelcolumns=labelcolumns, replicatecolumn=replicatecolumn + 1, replicatesexist=replicatesexist,
-                        replicateignore=replicateignore, growthmin=growthmin,
-                        alignvalue=alignvalue, fitparams=fitparams, noruns=noruns, nosamples=nosamples, logdata=logdata,
-                        makeplots=makeplots, showplots=showplots)
+            curvefitter(filename=filename, header=header, predefined_input=predefined_input, skip_rows=skip_rows,
+                        label_columns=label_columns, replicate_column=replicate_column + 1, replicates_exist=replicates_exist,
+                        replicate_ignore=replicate_ignore, growth_minimum=growth_minimum,
+                        alignment_value=alignment_value, fiting_parameters=fiting_parameters, no_runs=no_runs, no_samples=no_samples, logdata=logdata,
+                        make_plots=make_plots, show_plots=show_plots)
         return
 
-    elif replicatesexist & os.path.isfile(filename):
+    elif replicates_exist & os.path.isfile(filename):
         try:
-            infile = pd.read_csv(filename, header=header, skiprows=skiprows)
+            infile = pd.read_csv(filename, header=header, skiprows=skip_rows)
         except pd.parser.CParserError:
-            infile = pd.read_excel(filename, header=header, skiprows=skiprows)
+            infile = pd.read_excel(filename, header=header, skiprows=skip_rows)
         except pd.parser.ParserError:
-            infile = pd.read_excel(filename, header=header, skiprows=skiprows)
+            infile = pd.read_excel(filename, header=header, skiprows=skip_rows)
 
 
-        infile = cleannonreps(infile, replicatecolumn, replicateignore)
-        reps = infile.iloc[1:, replicatecolumn]
+        infile = cleannonreps(infile, replicate_column, replicate_ignore)
+        reps = infile.iloc[1:, replicate_column]
         unique_replicates = np.unique(reps)
 
         dataheight = unique_replicates.shape[0]
         datalength = infile.shape[1]
 
-        firstline = infile.iloc[0, labelcolumns - 1:].copy()
+        firstline = infile.iloc[0, label_columns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
-        print('++++++++++ Processing file ' + filename + '++++++++++')
-        print('++++++++++ Found ' + str(dataheight) + ' replicates ++++++++++')
+        print('++++++++++ Processing file {} ++++++++++'.format(filename))
+        print('++++++++++ Found {} replicates ++++++++++'.format(dataheight))
         for x in unique_replicates: print(x)
 
         sys.stdout.flush()
@@ -125,11 +125,11 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
 
     elif os.path.isfile(filename) is True:
         try:
-            infile = pd.read_csv(filename, header=header, skiprows=skiprows)
+            infile = pd.read_csv(filename, header=header, skiprows=skip_rows)
         except pd.parser.CParserError:
-            infile = pd.read_excel(filename, header=header, skiprows=skiprows)
+            infile = pd.read_excel(filename, header=header, skiprows=skip_rows)
         except pd.parser.ParserError:
-            infile = pd.read_excel(filename, header=header, skiprows=skiprows)
+            infile = pd.read_excel(filename, header=header, skiprows=skip_rows)
 
         filepath = os.path.split(filename)[0]
         filename = os.path.split(filename)[1]
@@ -147,37 +147,37 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     # Checks and makes output directories
     if not os.path.isdir(filepath):
         os.makedirs(filepath)
-    if makeplots:
+    if make_plots:
         if not os.path.isdir(os.path.join(filepath, filename + ' plots', )):
             os.makedirs(os.path.join(filepath, filename + ' plots', ))
 
     # Separate time variable
     time = infile.iloc[0]
-    time = time.iloc[labelcolumns:]
+    time = time.iloc[label_columns:]
     time = np.float64(time)
 
 
-    sanitychecks(infile, labelcolumns, normalise, time)
+    sanitychecks(infile, label_columns, normalise, time)
 
     try:
         for i in range(1, dataheight + 1):
-            if replicatesexist:
-                location = '++++++++++ Processing replicate set ' + str(i) + ' of ' + str(dataheight) + ' ++++++++++'
+            if replicates_exist:
+                location = '++++++++++ Processing replicate set {} of {} ++++++++++'.format(i,dataheight)
                 print(location)
                 replicate_chosen = unique_replicates[i - 1]
-                replicate_index = replicate_chosen == infile.iloc[:, replicatecolumn]
+                replicate_index = replicate_chosen == infile.iloc[:, replicate_column]
                 od = infile.loc[replicate_index]
 
                 # Defines names for results
                 labels = pd.DataFrame([replicate_chosen])
                 replicate_info1 = 'Fitting ' + replicate_chosen
                 print(replicate_info1)
-                od = (od.iloc[:, labelcolumns:]).copy()
+                od = (od.iloc[:, label_columns:]).copy()
 
                 # Converts columns to float format for fitderiv
                 od_float = np.array(od, dtype='float64')
                 od_float = normalise_traces(od_float, normalise)
-                od_float = align_replicates(od_float, normalise, alignvalue)
+                od_float = align_replicates(od_float, normalise, alignment_value)
                 noofreps = od_float.shape[0]
                 replicate_info2 = 'Found {} replicates'.format(noofreps)
                 print(replicate_info2)
@@ -203,11 +203,11 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 location = '++++++++++ Processing row {:03} of {:03} ++++++++++'.format(i, dataheight)
                 print(location)
                 od = infile.iloc[i]
-                od = od[labelcolumns + 1:]
+                od = od[label_columns + 1:]
                 noofreps = 1
 
                 # Defines names for results
-                labels = infile.iloc[i, 0:labelcolumns]
+                labels = infile.iloc[i, 0:label_columns]
                 labels = labels.copy()
 
                 # Converts columns to float format for fitderiv
@@ -228,15 +228,15 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                     od_float = odfloat[len(time)-1]
 
                 # Check for growth
-                growthfound = check_for_growth(od_float, growthmin, normalise)
+                growthfound = check_for_growth(od_float, growth_minimum, normalise)
             sys.stdout.flush()  # Forces prints to display immediately
 
             if growthfound:
-                # Runs fitderiv only if growth is over growthmin
+                # Runs fitderiv only if growth is over growth_minimum
                 for attemptno in range(5):
                     try:
-                        fitty = fitderiv(t, np.transpose(od_float), bd=fitparams, exitearly=False, nosamples=nosamples,
-                                         noruns=noruns, logs=logdata)  # Peters program
+                        fitty = fitderiv(t, np.transpose(od_float), bd=fiting_parameters, exitearly=False, nosamples=no_samples,
+                                         noruns=no_runs, logs=logdata)  # Peters program
                         break
                     except KeyboardInterrupt:
                         raise KeyboardInterrupt('User aborted run')
@@ -267,7 +267,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 fitdercurveerr = fitty.dfvar
                 functime = fitty.t
 
-                if makeplots:
+                if make_plots:
                     plt.figure()
                     plt.subplot(2, 1, 1)
                     plt.plot(functime, fitty.d, 'r.')
@@ -284,9 +284,9 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                     plt.ylabel('GR [Hr$^{-1}$]')
                     plt.xlabel('Time [h]')
 
-                    if replicatesexist:
+                    if replicates_exist:
                         picname = replicate_chosen
-                    elif predefinedinput == 'BMG':
+                    elif predefined_input == 'BMG':
                         picname = labels.iloc[0] + str(labels.iloc[1])
                     elif len(labels) == 1:
                         picname = labels.astype('str')
@@ -297,7 +297,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                     picname = picname + '.PNG'
                     picname = os.path.join(filepath, filename + ' plots', picname)
                     plt.savefig(picname)
-                    if showplots:
+                    if show_plots:
                         plt.ion()
                         plt.show()
                     else:
@@ -316,7 +316,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
                 fitcurveerr = np.zeros(datalength)
                 fitdercurve = np.zeros(datalength)
                 fitdercurveerr = np.zeros(datalength)
-                print("No growth found! Less than " + str(growthmin) + ' change in OD detected')
+                print("No growth found! Less than " + str(growth_minimum) + ' change in OD detected')
 
             # Sticks into the output variable (allows individual debugging)
             if i == 1:
@@ -350,7 +350,7 @@ def curvefitter(filename, header=None, predefinedinput=None, skiprows=0, labelco
     finally:
         # Always runs data saving in case of error
         if 'growthrates' in locals():  # Checks that there is data to save
-            if replicatesexist:
+            if replicates_exist:
                 varnames = ['Replicate Name', 'GR', 'GR Std Error', 'Lag', 'Time of max GR', 'no. of replicates']
             else:
                 x = list(range(labels.shape[0]))
@@ -468,7 +468,7 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols):
     else:
         # excel import
         files = glob(os.path.join(filedirectory, '*.[xX][lL][sS][xX]'))
-        print('++++++++++ Found ' + str(len(files)) + ' files ++++++++++')
+        print('++++++++++ Found {} files ++++++++++'.format(len(files)))
         for i in range(0, (len(files))):
             if i == 0:
                 testfile = pd.read_excel(files[i], header=header, skiprows=skiprows)
