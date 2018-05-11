@@ -51,6 +51,7 @@ class CurveFitter:
         self.skip_rows = skip_rows
         self.label_columns = label_columns
         self.replicate_column = replicate_column
+        self.data_start = label_columns+1
 
         self.replicates_exist = replicates_exist
         self.replicate_ignore = replicate_ignore
@@ -122,23 +123,43 @@ class CurveFitter:
         self.normalise_traces()
         self.check_for_growth()
         self.set_replicates()
+        self.run_fitting()
+
+    def set_indexes(self,datadict):
+        timelist = datadict['time'].values
+        indexlist =[]
+        n = 0
+        for item in timelist:
+            if item == '':
+                indexlist.append(['x']*n)
+                n+=1
+            else:
+                indexlist.append(item)
+        datadict['data'].columns=indexlist
 
     def run_fitting(self):
         for data_dict in self.data_dicts:
+            self.set_indexes(data_dict)
             # name:time:data:growth
             all_datasets = []
             # each set to be fitted needs split into lists of [name,time,data,growthstatus]
+            df_stats = pd.DataFrame()
+            df_fitted_curves = pd.DataFrame(columns=data_dict['data'].columns)
+            df_fitted_curves_err =pd.DataFrame(columns=data_dict['data'].columns)
+            df_deriv_curves =pd.DataFrame(columns=data_dict['data'].columns)
+            df_derive_curves_err =pd.DataFrame(columns=data_dict['data'].columns)
+
             if self.replicates_exist:
                 for i, replicatename in enumerate(data_dict['replicates']):
                     dataset = [replicatename]
                     time = data_dict['time']
-                    time = time.loc[self.label_columns:].values
+                    time = time.loc[self.data_start:].values
                     dataset.append(time)
                     data = data_dict['data'][data_dict.iloc[:, self.replicate_column] == replicatename]
                     if isinstance(data, pd.Series):
-                        data = data.loc[self.label_columns:].values
+                        data = data.loc[self.data_start:].values
                     else:
-                        data = data.loc[:, self.label_columns:].values
+                        data = data.loc[:, self.data_start:].values
                     data = self.align_replicates(data)
                     dataset.append(data)
                     growth = data_dict['growth_check'][data_dict.iloc[:, self.replicate_column] == replicatename]
@@ -146,13 +167,13 @@ class CurveFitter:
                     all_datasets.append(dataset)
             else:
                 for i, index in enumerate(data_dict['data'].index.values):
-                    label = data_dict['data'].loc[index, :self.label_columns].values
+                    label = data_dict['data'].loc[index, :self.data_start].values
                     dataset = [label]
                     time = data_dict['time']
-                    time = time.loc[self.label_columns:].values
+                    time = time.loc[self.data_start:].values
                     dataset.append(time)
                     data = data_dict['data'].loc[index, :]
-                    data = data.loc[self.label_columns:].values
+                    data = data.loc[self.data_start:].values
                     dataset.append(data)
                     growth = data_dict['growth_check'][i]
                     dataset.append(growth)
@@ -201,6 +222,7 @@ class CurveFitter:
                     lag = fitty.ds['lag time']
                     timeofmax_gr = fitty.ds['time of max df']
                     note = ["Normal"]
+                    noofreps = od.shape[0]
                     fitcurve = fitty.f
                     fitcurveerr = fitty.fvar
                     fitdercurve = fitty.df
@@ -208,7 +230,7 @@ class CurveFitter:
                     functime = fitty.t
                 else:
                     # Returns no growth if none detected
-                    datalength = data.shape[1]
+                    datalength = len(t)
                     gr = 0
                     err = 0
                     lag = 0
@@ -221,6 +243,32 @@ class CurveFitter:
                     fitdercurve = np.zeros(datalength)
                     fitdercurveerr = np.zeros(datalength)
                     print('No growth found! Less than {} change in OD detected'.format(self.growth_minimum))
+
+                stats = [].extend(label)
+                statnames = ['label']*len(stats)
+                statnames.append(['no. of replicates','Growth Rate','Growth Rate SE','Lag','Time of max GR','notes on fitting'])
+                stats.extend([noofreps,gr,err,lag,timeofmax_gr,note])
+                stats = pd.Series(stats, index=statnames)
+                fitcurve = pd.Series(fitcurve,index=t)
+                fitcurveerr = pd.Series(fitcurveerr, index=t)
+                fitdercurve = pd.Series(fitdercurve,index=t)
+                fitdercurveerr=pd.Series(fitdercurveerr,index=t)
+
+                df_stats.join(stats)
+                df_fitted_curves.join(fitcurve)
+                df_fitted_curves_err.join(fitcurveerr)
+                df_deriv_curves.join(fitdercurve)
+                df_derive_curves_err.join(fitdercurveerr)
+
+            outputname = data_dict['output_filepath']
+            sheetnames = ['Stats', 'Fit', 'Fit std error', 'Derivative', 'Derivative std error']
+            writer = pd.ExcelWriter(outputname, engine='xlsxwriter')
+            df_stats.to_excel(writer,sheet_name=sheetnames[0])
+            df_fitted_curves.to_excel(writer,sheet_name=sheetnames[1])
+            df_fitted_curves_err.to_excel(writer,sheet_name=sheetnames[2])
+            df_deriv_curves.to_excel(writer,sheet_name=sheetnames[3])
+            df_derive_curves_err.to_excel(writer,sheet_name=sheetnames[4])
+            writer.save()
 
 
 
@@ -282,7 +330,7 @@ class CurveFitter:
     def filter_data(self):
         for data_dict in self.data_dicts:
             if self.replicate_ignore is not None:
-                if isinstance(repignore, str):
+                if isinstance(self.repignore, str):
                     column = data_dict['data'].loc[:, self.replicate_column]
                     filterarray = [re.match(self.replicate_ignore, x) for x in column]
                     data_dict['data'] = data_dict['data'].loc[filterarray]
@@ -291,10 +339,11 @@ class CurveFitter:
         # Normalises line by line on points 5:15
         for data_dict in self.data_dicts:
             for i in data_dict['data'].index.values:
-                zeroingvalue = np.nanmin(data_dict['data'].loc[i, self.replicate_column:])
+                datasub = data_dict['data'].loc[i, self.data_start:]
+                zeroingvalue = np.nanmin(data_dict['data'].loc[i, self.data_start:])
                 zeroingvalue = self.normalise - zeroingvalue
-                data_dict[0].loc[i, self.replicate_column:] = data_dict['data'].loc[i,
-                                                              self.replicate_column:] + zeroingvalue
+                data_dict['data'].loc[i, self.data_start:] = data_dict['data'].loc[i,
+                                                              self.data_start:] + zeroingvalue
 
 
 def curvefitter(filename, header=None, predefined_input=None, skip_rows=0, label_columns=3, replicate_column=3,
