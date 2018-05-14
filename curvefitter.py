@@ -51,7 +51,7 @@ class CurveFitter:
         self.skip_rows = skip_rows
         self.label_columns = label_columns
         self.replicate_column = replicate_column
-        self.data_start = label_columns+1
+        self.data_start = int(label_columns + 1)
 
         self.replicates_exist = replicates_exist
         self.replicate_ignore = replicate_ignore
@@ -125,17 +125,18 @@ class CurveFitter:
         self.set_replicates()
         self.run_fitting()
 
-    def set_indexes(self,datadict):
-        timelist = datadict['time'].values
-        indexlist =[]
+    def set_indexes(self, datadict):
+        timelist = datadict['time_data'].values
+        indexlist = []
         n = 0
         for item in timelist:
-            if item == '':
-                indexlist.append(['x']*n)
-                n+=1
+            test = isinstance(item,str)
+            if not isinstance(item,str):
+                indexlist.append('x_' + str(n))
+                n += 1
             else:
                 indexlist.append(item)
-        datadict['data'].columns=indexlist
+        datadict['data'].columns = indexlist
 
     def run_fitting(self):
         for data_dict in self.data_dicts:
@@ -145,14 +146,14 @@ class CurveFitter:
             # each set to be fitted needs split into lists of [name,time,data,growthstatus]
             df_stats = pd.DataFrame()
             df_fitted_curves = pd.DataFrame(columns=data_dict['data'].columns)
-            df_fitted_curves_err =pd.DataFrame(columns=data_dict['data'].columns)
-            df_deriv_curves =pd.DataFrame(columns=data_dict['data'].columns)
-            df_derive_curves_err =pd.DataFrame(columns=data_dict['data'].columns)
+            df_fitted_curves_err = pd.DataFrame(columns=data_dict['data'].columns)
+            df_deriv_curves = pd.DataFrame(columns=data_dict['data'].columns)
+            df_derive_curves_err = pd.DataFrame(columns=data_dict['data'].columns)
 
             if self.replicates_exist:
                 for i, replicatename in enumerate(data_dict['replicates']):
                     dataset = [replicatename]
-                    time = data_dict['time']
+                    time = data_dict['time_data']
                     time = time.loc[self.data_start:].values
                     dataset.append(time)
                     data = data_dict['data'][data_dict.iloc[:, self.replicate_column] == replicatename]
@@ -167,13 +168,14 @@ class CurveFitter:
                     all_datasets.append(dataset)
             else:
                 for i, index in enumerate(data_dict['data'].index.values):
-                    label = data_dict['data'].loc[index, :self.data_start].values
+                    label = data_dict['data'].loc[index]
+                    label = label.iloc[:self.label_columns]
                     dataset = [label]
-                    time = data_dict['time']
-                    time = time.loc[self.data_start:].values
+                    time = data_dict['time_data']
+                    time = time.iloc[self.data_start:].values
                     dataset.append(time)
                     data = data_dict['data'].loc[index, :]
-                    data = data.loc[self.data_start:].values
+                    data = data.iloc[self.data_start:].values
                     dataset.append(data)
                     growth = data_dict['growth_check'][i]
                     dataset.append(growth)
@@ -181,21 +183,25 @@ class CurveFitter:
 
             for dataset in all_datasets:
                 label = dataset[0]
-                time = dataset[1]
-                data = dataset[2]
+                time = np.atleast_2d(dataset[1])
+                data = np.atleast_2d(dataset[2])
                 growth = dataset[3]
+                data = np.array(data,dtype=float)
 
                 max_index_array = np.where(np.isnan(data))
-                max_index = np.min(max_index_array[1])
+                if max_index_array[0]:
+                    max_index = np.min(max_index_array[-1,:])
+                else:
+                    max_index = data.shape[-1]
 
                 t = time[:, :max_index]
                 od = data[:, :max_index]
                 od = od[growth]
-                if od.shape[0]>0:
+                if od.shape[0] > 0:
                     # Runs fitderiv only if growth is over growth_minimum
                     for attemptno in range(5):
                         try:
-                            fitty = fitderiv(t, np.transpose(od), bd=self.fiting_parameters, exitearly=False,
+                            fitty = fitderiv(t[0,:], np.transpose(od), bd=self.fiting_parameters, exitearly=False,
                                              nosamples=self.no_samples,
                                              noruns=self.no_runs, logs=self.logdata)  # Peters program
                             break
@@ -244,15 +250,18 @@ class CurveFitter:
                     fitdercurveerr = np.zeros(datalength)
                     print('No growth found! Less than {} change in OD detected'.format(self.growth_minimum))
 
-                stats = [].extend(label)
-                statnames = ['label']*len(stats)
-                statnames.append(['no. of replicates','Growth Rate','Growth Rate SE','Lag','Time of max GR','notes on fitting'])
-                stats.extend([noofreps,gr,err,lag,timeofmax_gr,note])
-                stats = pd.Series(stats, index=statnames)
-                fitcurve = pd.Series(fitcurve,index=t)
-                fitcurveerr = pd.Series(fitcurveerr, index=t)
-                fitdercurve = pd.Series(fitdercurve,index=t)
-                fitdercurveerr=pd.Series(fitdercurveerr,index=t)
+                statnames = ['label'] * label.size
+                statnames.extend(
+                    ['no. of replicates', 'Growth Rate', 'Growth Rate SE', 'Lag', 'Time of max GR', 'notes on fitting'])
+                stats = label.copy()
+                stats = stats.append(pd.Series([noofreps, gr, err, lag, timeofmax_gr, note]))
+                stats.index = statnames
+
+                stats.name = i
+                fitcurve = pd.Series(fitcurve, index=t, name=i)
+                fitcurveerr = pd.Series(fitcurveerr, index=t, name=i)
+                fitdercurve = pd.Series(fitdercurve, index=t, name=i)
+                fitdercurveerr = pd.Series(fitdercurveerr, index=t, name=i)
 
                 df_stats.join(stats)
                 df_fitted_curves.join(fitcurve)
@@ -263,14 +272,12 @@ class CurveFitter:
             outputname = data_dict['output_filepath']
             sheetnames = ['Stats', 'Fit', 'Fit std error', 'Derivative', 'Derivative std error']
             writer = pd.ExcelWriter(outputname, engine='xlsxwriter')
-            df_stats.to_excel(writer,sheet_name=sheetnames[0])
-            df_fitted_curves.to_excel(writer,sheet_name=sheetnames[1])
-            df_fitted_curves_err.to_excel(writer,sheet_name=sheetnames[2])
-            df_deriv_curves.to_excel(writer,sheet_name=sheetnames[3])
-            df_derive_curves_err.to_excel(writer,sheet_name=sheetnames[4])
+            df_stats.to_excel(writer, sheet_name=sheetnames[0])
+            df_fitted_curves.to_excel(writer, sheet_name=sheetnames[1])
+            df_fitted_curves_err.to_excel(writer, sheet_name=sheetnames[2])
+            df_deriv_curves.to_excel(writer, sheet_name=sheetnames[3])
+            df_derive_curves_err.to_excel(writer, sheet_name=sheetnames[4])
             writer.save()
-
-
 
     def align_replicates(self, dataset):
         if self.alignment_value is not None:
@@ -314,9 +321,9 @@ class CurveFitter:
         if self.growth_minimum is not None:
             growth_min_normed = self.growth_minimum + self.normalise
             for data_dict in self.data_dicts:
-                test = np.ndarray(data_dict['data'].shape[0])
-                for i in data_dict['data'].index.values:
-                    for ii in range(data_dict['data'].shape[1]):
+                test = [False]*data_dict['data'].shape[0]
+                for n, i in enumerate(data_dict['data'].index.values):
+                    for ii in range(self.data_start, data_dict['data'].shape[1]-2):
                         if (data_dict['data'].loc[i, ii] > growth_min_normed) & (
                                 data_dict['data'].loc[i, ii + 1] > growth_min_normed) & (
                                 data_dict['data'].loc[i, ii + 2] > growth_min_normed):
@@ -324,7 +331,7 @@ class CurveFitter:
                             break
                         else:
                             growth = False
-                    test[i] = growth
+                    test[n] = growth
                 data_dict['growth_check'] = test
 
     def filter_data(self):
@@ -343,7 +350,7 @@ class CurveFitter:
                 zeroingvalue = np.nanmin(data_dict['data'].loc[i, self.data_start:])
                 zeroingvalue = self.normalise - zeroingvalue
                 data_dict['data'].loc[i, self.data_start:] = data_dict['data'].loc[i,
-                                                              self.data_start:] + zeroingvalue
+                                                             self.data_start:] + zeroingvalue
 
 
 def curvefitter(filename, header=None, predefined_input=None, skip_rows=0, label_columns=3, replicate_column=3,
@@ -380,7 +387,7 @@ def curvefitter(filename, header=None, predefined_input=None, skip_rows=0, label
         skip_rows = 63
         label_columns = 1
 
-    normalise = 10**(-2)
+    normalise = 10 ** (-2)
     waterwells = False  # no longer necessary but left
     replicate_column = replicate_column - 1  # converts to index from number
 
@@ -395,13 +402,11 @@ def curvefitter(filename, header=None, predefined_input=None, skip_rows=0, label
         reps = input_dataframe.iloc[1:, replicate_column]
         unique_replicates = np.unique(reps)
 
-
         # Provide info about datashape for interation to use
         dataheight = unique_replicates.shape[0]
         datalength = input_dataframe.shape[1]
         firstline = input_dataframe.iloc[0, label_columns - 1:].copy()
         firstline = firstline.reset_index(drop=True)
-
 
         print('++++++++++ Found {} replicates ++++++++++'.format(dataheight))
         for x in unique_replicates: print(x)
@@ -416,7 +421,8 @@ def curvefitter(filename, header=None, predefined_input=None, skip_rows=0, label
             print(filename)
             # Yay recursion
             curvefitter(filename=filename, header=header, predefined_input=predefined_input, skip_rows=skip_rows,
-                        label_columns=label_columns, replicate_column=replicate_column + 1, replicates_exist=replicates_exist,
+                        label_columns=label_columns, replicate_column=replicate_column + 1,
+                        replicates_exist=replicates_exist,
                         replicate_ignore=replicate_ignore, growth_minimum=growth_minimum,
                         alignment_value=alignment_value, fiting_parameters=fiting_parameters, no_runs=no_runs,
                         no_samples=no_samples, log_data=log_data,
@@ -489,7 +495,7 @@ def curvefitter(filename, header=None, predefined_input=None, skip_rows=0, label
     try:
         for i in range(1, dataheight + 1):
             if replicates_exist:
-                location = '++++++++++ Processing replicate set {} of {} ++++++++++'.format(i,dataheight)
+                location = '++++++++++ Processing replicate set {} of {} ++++++++++'.format(i, dataheight)
                 print(location)
                 replicate_chosen = unique_replicates[i - 1]
                 replicate_index = replicate_chosen == input_dataframe.iloc[:, replicate_column]
@@ -520,7 +526,7 @@ def curvefitter(filename, header=None, predefined_input=None, skip_rows=0, label
                     t = time[:ii]
                 except IndexError:
                     t = time
-                    od_float = odfloat[:, len(time)-1]
+                    od_float = odfloat[:, len(time) - 1]
 
                 if noofreps == 0:
                     growthfound = False
@@ -552,7 +558,7 @@ def curvefitter(filename, header=None, predefined_input=None, skip_rows=0, label
                     t = time[:ii]
                 except IndexError:
                     t = time
-                    od_float = odfloat[len(time)-1]
+                    od_float = odfloat[len(time) - 1]
 
                 # Check for growth
                 growthfound = check_for_growth(od_float, growth_minimum, normalise)
@@ -562,7 +568,8 @@ def curvefitter(filename, header=None, predefined_input=None, skip_rows=0, label
                 # Runs fitderiv only if growth is over growth_minimum
                 for attemptno in range(5):
                     try:
-                        fitty = fitderiv(t, np.transpose(od_float), bd=fiting_parameters, exitearly=False, nosamples=no_samples,
+                        fitty = fitderiv(t, np.transpose(od_float), bd=fiting_parameters, exitearly=False,
+                                         nosamples=no_samples,
                                          noruns=no_runs, logs=log_data)  # Peters program
                         break
                     except KeyboardInterrupt:
@@ -722,7 +729,7 @@ def sanitychecks(infile, labelcolumns, normalise, time):
         data = data[np.logical_not(np.isnan(data))]
         if len(data) > len(timecheck):
             print('ERROR in line {} \n Data is longer than time, truncating data'.format(i))
-            #raise RuntimeError('Error data is longer than time')
+            # raise RuntimeError('Error data is longer than time')
         if len(data) > 0:
             data = normalise_traces(data, normvalue=normalise)
             if any(data <= 0):
@@ -815,13 +822,14 @@ def multifilerepimport(filedirectory, header, skiprows, labelcols):
 
         return stackfile
 
+
 def normalise_traces(dataset, normvalue=0.01):
     # Normalises line by line on points 5:15
-    #normvalue = 10**(-2)
+    # normvalue = 10**(-2)
     try:
         x = dataset.shape[1]
         for i in range(0, dataset.shape[0]):
-            zeroingvalue = np.nanmin(dataset[i,:])
+            zeroingvalue = np.nanmin(dataset[i, :])
             zeroingvalue = normvalue - zeroingvalue
             dataset[i, :] = dataset[i, :] + zeroingvalue
         return dataset
@@ -854,7 +862,7 @@ def align_replicates(dataset, normvalue=0.05, alignvalue=0.1):
         for i in range(0, dataset.shape[0]):
             for ii in range(0, dataset.shape[1]):
                 if (dataset[i, ii] > alignpoint) & (dataset[i, ii + 1] > alignpoint) & (
-                            dataset[i, ii + 2] > alignpoint):
+                        dataset[i, ii + 2] > alignpoint):
                     x = ii
                     break
             startindexes[i] = np.int_(x)
@@ -882,7 +890,7 @@ def check_for_growth(data, growthmin, normalise):
             growthminnorm = growthmin + normalise
             for ii in range(0, data.shape[1] - 3):
                 if (data[i, ii] > growthminnorm) & (data[i, ii + 1] > growthminnorm) & (
-                            data[i, ii + 2] > growthminnorm):
+                        data[i, ii + 2] > growthminnorm):
                     growth = True
                     break
                 else:
@@ -902,5 +910,3 @@ def check_for_growth(data, growthmin, normalise):
         return test
     except:
         raise
-
-
