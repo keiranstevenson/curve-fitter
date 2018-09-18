@@ -13,6 +13,8 @@ from glob import glob
 import numpy as np
 import pandas as pd
 
+import matplotlib.pyplot as plt
+
 from fitderiv import fitderiv
 
 
@@ -93,6 +95,7 @@ class CurveFitter:
             location = os.path.join(os.path.split(fileloc)[0], 'curvefitter_outputdata')
             filename = os.path.split(fileloc)[1].split('.')[0]
             file_dict['output_filepath'] = os.path.join(location, filename + '.xlsx')
+            file_dict['plot_output_filepath'] = os.path.join(location,filename+' plots')
             if os.path.exists(location) is False:
                 os.mkdir(location)
             data_dicts.append(file_dict)
@@ -110,11 +113,18 @@ class CurveFitter:
             time_index = np.argmax([len(x) for x in time_list])
             new_file_dict['time_data'] = time_list[time_index]
             ### needs outputdata
+            location = file_location
+            new_file_dict['output_filepath'] = os.path.join(location, 'curvefitter_outputdata','Data.xlsx')
+            new_file_dict['plot_output_filepath'] = os.path.join(location, 'curvefitter_outputdata', 'plots')
+
             data_dicts = [new_file_dict]
         self.data_dicts = data_dicts
 
         ## build empty values for later
         for data_dict in self.data_dicts:
+            newfolder = data_dict['plot_output_filepath']
+            if os.path.exists(newfolder) is False:
+                os.mkdir(newfolder)
             data_dict['replicates'] = None
             data_dict['growth_check'] = None
             data_dict['fit_results'] = None
@@ -170,6 +180,7 @@ class CurveFitter:
             if self.replicates_exist:
                 for i, replicatename in enumerate(data_dict['replicates']):
 
+
                     dataset = [pd.Series(replicatename)]
                     time = data_dict['time_data']
                     time = time.loc[self.data_start:].values
@@ -201,6 +212,10 @@ class CurveFitter:
 
             for dataset in all_datasets:
                 label = dataset[0]
+                if isinstance(label,pd.Series):
+                    print('fitting {}'.format(label.values))
+                else:
+                    print('fitting {}'.format(label))
                 time = np.atleast_2d(dataset[1])
                 data = np.atleast_2d(dataset[2])
                 growth = dataset[3]
@@ -211,8 +226,9 @@ class CurveFitter:
                 data = self.align_replicates(data)
 
                 max_index_array = np.where(np.isnan(data))
-                if all(max_index_array):
-                    max_index = np.min(max_index_array[-1])
+                max_index_array = max_index_array[-1]
+                if any(max_index_array):
+                    max_index = np.min(max_index_array)
                 else:
                     max_index = data.shape[-1]
 
@@ -258,6 +274,35 @@ class CurveFitter:
                     fitdercurve = fitty.df
                     fitdercurveerr = fitty.dfvar
                     functime = fitty.t
+
+                    if self.make_plots:
+                        plt.figure()
+                        plt.subplot(2, 1, 1)
+                        plt.plot(functime, fitty.d[...,0], 'r.')
+                        plt.plot(functime, fitcurve, 'b')
+                        if self.logdata:
+                            plt.ylabel('log OD')
+                        else:
+                            plt.ylabel('OD')
+                        plt.xlabel('Time [h]')
+                        plt.subplot(2, 1, 2)
+                        plt.plot(functime, fitdercurve, 'b')
+                        plt.fill_between(functime, fitdercurve - np.sqrt(fitdercurveerr),
+                                         fitdercurve + np.sqrt(fitdercurveerr), facecolor='blue', alpha=0.2)
+                        plt.ylabel('GR [Hr$^{-1}$]')
+                        plt.xlabel('Time [h]')
+
+                        nametext = '_'.join([str(x) for x in label.values])
+                        picname = nametext + '.PNG'
+                        picname = os.path.join(data_dict['plot_output_filepath'], picname)
+                        plt.savefig(picname)
+                        if self.show_plots:
+                            plt.ion()
+                            plt.show()
+                            plt.pause(0.2)
+                        else:
+                            plt.close()
+
                 else:
                     # Returns no growth if none detected
                     datalength = len(t)
@@ -409,7 +454,19 @@ class CurveFitter:
         for data_dict in self.data_dicts:
             for i in data_dict['data'].index.values:
                 datasub = data_dict['data'].loc[i, self.data_start:]
+                zeroingvalue = np.nanmean(data_dict['data'].loc[i, self.data_start+4:14])
+                zeroingvalue = self.normalise - zeroingvalue
+                data_dict['data'].loc[i, self.data_start:] = data_dict['data'].loc[i,
+                                                             self.data_start:] + zeroingvalue
+
+    def normalise_traces_to_value(self):
+        # Normalises to the lowest possible value
+        for data_dict in self.data_dicts:
+            for i in data_dict['data'].index.values:
+                datasub = data_dict['data'].loc[i, self.data_start:]
                 zeroingvalue = np.nanmin(data_dict['data'].loc[i, self.data_start:])
                 zeroingvalue = self.normalise - zeroingvalue
                 data_dict['data'].loc[i, self.data_start:] = data_dict['data'].loc[i,
                                                              self.data_start:] + zeroingvalue
+
+
