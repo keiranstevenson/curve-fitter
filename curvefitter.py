@@ -206,7 +206,7 @@ class CurveFitter:
                     data = data_dict['data'].loc[index, :]
                     data = data.iloc[self.data_start:].values
                     dataset.append(data)
-                    growth = data_dict['growth_check'][i]
+                    growth = [data_dict['growth_check'][i]]
                     dataset.append(growth)
                     all_datasets.append(dataset)
 
