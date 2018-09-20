@@ -27,7 +27,8 @@ time = np.arange(0,21,0.1)
 a = 1
 u = 0.5
 c = 2
-y = fitbiolog(time,a,u,c)
+# y = fitbiolog(time,a,u,c)
+y = fitexp(time,a,u,c)
 # plt.plot(time,y)
 # plt.show()
 
@@ -37,5 +38,6 @@ print(frame)
 outputname = 'temp.xlsx'
 writer = pd.ExcelWriter(outputname, engine='xlsxwriter')
 frame.to_excel(writer)
-
-fitter = cfit(writer, skip_rows=0, label_columns=1, replicate_column=1, no_runs=4,no_samples=10, show_plots=True)
+writer.close()
+fitter = cfit(writer, growth_minimum=0.001, skip_rows=1, label_columns=1, replicate_column=1, no_runs=4,no_samples=10, show_plots=True,replicates_exist=False, logdata=True)
+fitter.fit_data()

@@ -223,131 +223,144 @@ class CurveFitter:
                 time = np.array(time, dtype=np.float64)
 
                 data = data[growth]
-                data = self.align_replicates(data)
+                if len(data)>0:
+                    data = self.align_replicates(data)
 
-                ## NaN removal
-                max_index_array = np.where(np.isnan(data))
-                max_index_array = max_index_array[-1]
-                if any(max_index_array):
-                    max_index = np.min(max_index_array)
-                else:
-                    max_index = data.shape[-1]
-                ##
+                    ## NaN removal
+                    data[data<0] = np.nan
 
-                t = time[:, :max_index]
-                t = t[0]
-                od = data[:, :max_index]
+                    nanfilter = np.isnan(data)
+                    nanfilter = np.any(nanfilter,axis=0)
+                    t = time[:,:data.shape[1]]
+                    t = t[:,np.logical_not(nanfilter)]
+                    t=t[0]
+                    od = data[:,np.logical_not(nanfilter)]
 
-                if od.shape[0] > 0:
-                    # Runs fitderiv only if growth is over growth_minimum
-                    for attemptno in range(5):
-                        try:
-                            fitty = fitderiv(t.astype(np.float64), np.transpose(od), bd=self.fiting_parameters,
-                                             exitearly=False,
-                                             nosamples=self.no_samples,
-                                             noruns=self.no_runs, logs=self.logdata)  # Peters program
-                            break
-                        except KeyboardInterrupt:
-                            raise KeyboardInterrupt('User aborted run')
-                        except MemoryError:
-                            version = platform.architecture()[0]
-                            if version == '32bit':
-                                raise MemoryError(
-                                    'Out of Memory while fitting. Try installing 64-bit python or using fewer replicates')
-                            elif version == '64bit':
-                                raise MemoryError('Out of memory while fitting. Try using fewer replicates')
+
+                    ## old NaN removal
+                    # max_index_array = np.where(np.isnan(data))
+                    # max_index_array = max_index_array[-1]
+                    # if any(max_index_array):
+                    #     max_index = np.min(max_index_array)
+                    # else:
+                    #     max_index = data.shape[-1]
+                    #
+                    #
+                    # t = time[:, :max_index]
+                    # t = t[0]
+                    # od = data[:, :max_index]
+                    ##
+
+                    if od.shape[0] > 0:
+                        # Runs fitderiv only if growth is over growth_minimum
+                        for attemptno in range(5):
+                            try:
+                                fitty = fitderiv(t.astype(np.float64), np.transpose(od), bd=self.fiting_parameters,
+                                                 exitearly=False,
+                                                 nosamples=self.no_samples,
+                                                 noruns=self.no_runs, logs=self.logdata)  # Peters program
+                                break
+                            except KeyboardInterrupt:
+                                raise KeyboardInterrupt('User aborted run')
+                            except MemoryError:
+                                version = platform.architecture()[0]
+                                if version == '32bit':
+                                    raise MemoryError(
+                                        'Out of Memory while fitting. Try installing 64-bit python or using fewer replicates')
+                                elif version == '64bit':
+                                    raise MemoryError('Out of memory while fitting. Try using fewer replicates')
+                                else:
+                                    raise MemoryError(
+                                        'Out of memory while fitting. Unable to determine python version, try making more memory available or using fewer replicates')
+
+                            except:
+                                print('Fitting failure, retrying')
+                                if attemptno == 4:
+                                    raise
+                        # Pulls stats and data from Peters routine
+                        gr = fitty.ds['max df']
+                        err = fitty.ds['max df var']
+                        lag = fitty.ds['lag time']
+                        timeofmax_gr = fitty.ds['time of max df']
+                        note = ["Normal"]
+                        noofreps = od.shape[0]
+                        fitcurve = fitty.f
+                        fitcurveerr = fitty.fvar
+                        fitdercurve = fitty.df
+                        fitdercurveerr = fitty.dfvar
+                        functime = fitty.t
+
+                        if self.make_plots:
+                            plt.figure()
+                            plt.subplot(2, 1, 1)
+                            plt.plot(functime, fitty.d[...,0], 'r.')
+                            plt.plot(functime, fitcurve, 'b')
+                            if self.logdata:
+                                plt.ylabel('log OD')
                             else:
-                                raise MemoryError(
-                                    'Out of memory while fitting. Unable to determine python version, try making more memory available or using fewer replicates')
+                                plt.ylabel('OD')
+                            plt.xlabel('Time [h]')
+                            plt.subplot(2, 1, 2)
+                            plt.plot(functime, fitdercurve, 'b')
+                            plt.fill_between(functime, fitdercurve - np.sqrt(fitdercurveerr),
+                                             fitdercurve + np.sqrt(fitdercurveerr), facecolor='blue', alpha=0.2)
+                            plt.ylabel('GR [Hr$^{-1}$]')
+                            plt.xlabel('Time [h]')
 
-                        except:
-                            print('Fitting failure, retrying')
-                            if attemptno == 4:
-                                raise
-                    # Pulls stats and data from Peters routine
-                    gr = fitty.ds['max df']
-                    err = fitty.ds['max df var']
-                    lag = fitty.ds['lag time']
-                    timeofmax_gr = fitty.ds['time of max df']
-                    note = ["Normal"]
-                    noofreps = od.shape[0]
-                    fitcurve = fitty.f
-                    fitcurveerr = fitty.fvar
-                    fitdercurve = fitty.df
-                    fitdercurveerr = fitty.dfvar
-                    functime = fitty.t
+                            nametext = '_'.join([str(x) for x in label.values])
+                            picname = nametext + '.PNG'
+                            picname = os.path.join(data_dict['plot_output_filepath'], picname)
+                            plt.savefig(picname)
+                            if self.show_plots:
+                                plt.ion()
+                                plt.show()
+                                plt.pause(0.2)
+                            else:
+                                plt.close()
 
-                    if self.make_plots:
-                        plt.figure()
-                        plt.subplot(2, 1, 1)
-                        plt.plot(functime, fitty.d[...,0], 'r.')
-                        plt.plot(functime, fitcurve, 'b')
-                        if self.logdata:
-                            plt.ylabel('log OD')
-                        else:
-                            plt.ylabel('OD')
-                        plt.xlabel('Time [h]')
-                        plt.subplot(2, 1, 2)
-                        plt.plot(functime, fitdercurve, 'b')
-                        plt.fill_between(functime, fitdercurve - np.sqrt(fitdercurveerr),
-                                         fitdercurve + np.sqrt(fitdercurveerr), facecolor='blue', alpha=0.2)
-                        plt.ylabel('GR [Hr$^{-1}$]')
-                        plt.xlabel('Time [h]')
+                    else:
+                        # Returns no growth if none detected
+                        datalength = len(t)
+                        gr = 0
+                        err = 0
+                        lag = 0
+                        note = ["No Growth"]
+                        timeofmax_gr = 0
+                        noofreps = 0
 
-                        nametext = '_'.join([str(x) for x in label.values])
-                        picname = nametext + '.PNG'
-                        picname = os.path.join(data_dict['plot_output_filepath'], picname)
-                        plt.savefig(picname)
-                        if self.show_plots:
-                            plt.ion()
-                            plt.show()
-                            plt.pause(0.2)
-                        else:
-                            plt.close()
+                        fitcurve = np.zeros(datalength)
+                        fitcurveerr = np.zeros(datalength)
+                        fitdercurve = np.zeros(datalength)
+                        fitdercurveerr = np.zeros(datalength)
+                        print('No growth found! Less than {} change in OD detected'.format(self.growth_minimum))
 
-                else:
-                    # Returns no growth if none detected
-                    datalength = len(t)
-                    gr = 0
-                    err = 0
-                    lag = 0
-                    note = ["No Growth"]
-                    timeofmax_gr = 0
-                    noofreps = 0
+                    labelheader = []
+                    for i in range(label.size):
+                        labelheader.append(str(i) + '_label')
+                    label.index = labelheader
+                    statnames = labelheader.copy()
+                    statnames.extend(
+                        ['no. of replicates', 'Growth Rate', 'Growth Rate SE', 'Lag', 'Time of max GR', 'notes on fitting'])
+                    stats = label.copy()
+                    stats = stats.append(pd.Series([noofreps, gr, err, lag, timeofmax_gr, note]))
+                    stats.index = statnames
 
-                    fitcurve = np.zeros(datalength)
-                    fitcurveerr = np.zeros(datalength)
-                    fitdercurve = np.zeros(datalength)
-                    fitdercurveerr = np.zeros(datalength)
-                    print('No growth found! Less than {} change in OD detected'.format(self.growth_minimum))
+                    stats.name = i
+                    fitcurve = label.append(pd.Series(fitcurve, index=t, name=i))
+                    fitcurveerr = label.append(pd.Series(fitcurveerr, index=t, name=i))
+                    fitdercurve = label.append(pd.Series(fitdercurve, index=t, name=i))
+                    fitdercurveerr = label.append(pd.Series(fitdercurveerr, index=t, name=i))
 
-                labelheader = []
-                for i in range(label.size):
-                    labelheader.append(str(i) + '_label')
-                label.index = labelheader
-                statnames = labelheader.copy()
-                statnames.extend(
-                    ['no. of replicates', 'Growth Rate', 'Growth Rate SE', 'Lag', 'Time of max GR', 'notes on fitting'])
-                stats = label.copy()
-                stats = stats.append(pd.Series([noofreps, gr, err, lag, timeofmax_gr, note]))
-                stats.index = statnames
+                    fitcurve.name = i
+                    fitcurveerr.name = i
+                    fitdercurve.name = i
+                    fitdercurveerr.name = i
 
-                stats.name = i
-                fitcurve = label.append(pd.Series(fitcurve, index=t, name=i))
-                fitcurveerr = label.append(pd.Series(fitcurveerr, index=t, name=i))
-                fitdercurve = label.append(pd.Series(fitdercurve, index=t, name=i))
-                fitdercurveerr = label.append(pd.Series(fitdercurveerr, index=t, name=i))
-
-                fitcurve.name = i
-                fitcurveerr.name = i
-                fitdercurve.name = i
-                fitdercurveerr.name = i
-
-                df_stats = df_stats.append(stats)
-                df_fitted_curves = df_fitted_curves.append(fitcurve)
-                df_fitted_curves_err = df_fitted_curves_err.append(fitcurveerr)
-                df_deriv_curves = df_deriv_curves.append(fitdercurve)
-                df_derive_curves_err = df_derive_curves_err.append(fitdercurveerr)
+                    df_stats = df_stats.append(stats)
+                    df_fitted_curves = df_fitted_curves.append(fitcurve)
+                    df_fitted_curves_err = df_fitted_curves_err.append(fitcurveerr)
+                    df_deriv_curves = df_deriv_curves.append(fitdercurve)
+                    df_derive_curves_err = df_derive_curves_err.append(fitdercurveerr)
 
             allcolumns = df_fitted_curves.columns
             allcolumns = self.sort_columns(allcolumns)
@@ -457,7 +470,7 @@ class CurveFitter:
             for i in data_dict['data'].index.values:
                 datasub = data_dict['data'].loc[i, self.data_start:]
                 zeroingvalue = np.nanmean(data_dict['data'].loc[i, self.data_start+4:14])
-                zeroingvalue = self.normalise - zeroingvalue
+                zeroingvalue = 0-zeroingvalue
                 data_dict['data'].loc[i, self.data_start:] = data_dict['data'].loc[i,
                                                              self.data_start:] + zeroingvalue
 
