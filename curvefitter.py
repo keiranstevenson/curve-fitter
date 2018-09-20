@@ -225,12 +225,14 @@ class CurveFitter:
                 data = data[growth]
                 data = self.align_replicates(data)
 
+                ## NaN removal
                 max_index_array = np.where(np.isnan(data))
                 max_index_array = max_index_array[-1]
                 if any(max_index_array):
                     max_index = np.min(max_index_array)
                 else:
                     max_index = data.shape[-1]
+                ##
 
                 t = time[:, :max_index]
                 t = t[0]
