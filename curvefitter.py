@@ -227,7 +227,7 @@ class CurveFitter:
                     data = self.align_replicates(data)
 
                     ## NaN removal
-                    data[data<0] = np.nan
+                    data[data<=0] = np.nan
 
                     nanfilter = np.isnan(data)
                     nanfilter = np.any(nanfilter,axis=0)
@@ -470,7 +470,7 @@ class CurveFitter:
             for i in data_dict['data'].index.values:
                 datasub = data_dict['data'].loc[i, self.data_start:]
                 zeroingvalue = np.nanmean(data_dict['data'].loc[i, self.data_start+4:14])
-                zeroingvalue = 0-zeroingvalue
+                zeroingvalue = (1e-6)-zeroingvalue
                 data_dict['data'].loc[i, self.data_start:] = data_dict['data'].loc[i,
                                                              self.data_start:] + zeroingvalue
 
