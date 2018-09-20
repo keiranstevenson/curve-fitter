@@ -33,6 +33,7 @@ def funcexp(x, a, u, c):
     y = a*np.exp(u*x)+c
     y[:l] = y[l-1]
     y[l:l*5] = 0
+    y[-20:]=y[-21]
     return y
 
 #linear
@@ -145,7 +146,7 @@ writer.close()
 fitter = cfit(outputname, growth_minimum=0.001, skip_rows=1, label_columns=1, replicate_column=1, no_runs=10,no_samples=50,
               show_plots=True,replicates_exist=False, logdata=True)
 fitter.fiting_parameters = {0: [-3, 8], 1: [-6, 8], 2: [-5, 2]}
-fitter.logdata=True
+fitter.logdata=False
 for file in alloutputs:
     fitter.file_import(file)
     fitter.fit_data()
